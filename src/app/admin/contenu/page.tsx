@@ -86,6 +86,16 @@ const contentFields = [
     type: "textarea" as const,
   },
   {
+    key: "about_members_title",
+    label: "La chorale — titre trombinoscope",
+    type: "textarea" as const,
+  },
+  {
+    key: "about_members_text",
+    label: "La chorale — texte trombinoscope",
+    type: "textarea" as const,
+  },
+  {
     key: "activities_intro",
     label: "Activités — introduction",
     type: "textarea" as const,
@@ -98,7 +108,8 @@ const contentFields = [
 ];
 
 export default async function AdminContentPage() {
-  const admin = await requirePermission("content");
+  await requirePermission("content");
+
   const supabase = createAdminClient();
 
   const { data, error } = await supabase
@@ -122,7 +133,6 @@ export default async function AdminContentPage() {
       <AdminHeader
         title="Contenu"
         description="Modifier les textes importants du site public."
-        email={admin.email}
       />
 
       <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
@@ -132,14 +142,15 @@ export default async function AdminContentPage() {
           <h2 className="text-xl font-black text-[#1f1f1a]">Conseil</h2>
 
           <p className="mt-4 text-sm leading-7 text-[#6d6b63]">
-            Garde les textes courts sur l’accueil. La page “La chorale” peut
-            contenir une histoire plus complète.
+            Garde l’accueil court. La page “La chorale” peut contenir une
+            histoire plus complète et présenter les membres.
           </p>
 
           <div className="mt-6 rounded-2xl bg-[#f3f0e8] p-4">
             <p className="text-sm font-bold text-[#687a5e]">Important</p>
             <p className="mt-2 text-sm leading-6 text-[#6d6b63]">
-              Après enregistrement, vérifie le rendu sur mobile et desktop.
+              Pour le trombinoscope, vérifie que les membres acceptent la
+              publication de leur photo sur le site.
             </p>
           </div>
         </aside>

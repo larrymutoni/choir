@@ -1,13 +1,11 @@
-import Image from "next/image";
 import { Heart, Music2, Sparkles, Users } from "lucide-react";
 import { Footer } from "@/components/public/Footer";
 import { Navbar } from "@/components/public/Navbar";
 import { Button } from "@/components/ui/Button";
 import { Reveal } from "@/components/ui/Reveal";
 import { contentArrayToMap } from "@/lib/content";
-import { buildImageMap, getSupabaseImageUrl } from "@/lib/images";
+import { getSupabaseImageUrl } from "@/lib/images";
 import { createClient } from "@/lib/supabase/server";
-import { FALLBACK_IMAGE_URL } from "@/lib/constants";
 
 const values = [
   {
@@ -43,13 +41,28 @@ export default async function AboutPage() {
 
   const content = contentArrayToMap(siteContent);
 
-  const imageMap = buildImageMap(siteImages);
+  const imageMap = (siteImages ?? []).reduce<
+    Record<string, { path: string; alt_text: string; updated_at: string }>
+  >((acc, image) => {
+    acc[image.key] = {
+      path: image.path,
+      alt_text: image.alt_text,
+      updated_at: image.updated_at,
+    };
+
+    return acc;
+  }, {});
 
   const aboutImage = imageMap.about_main;
+  const membersImage = imageMap.members_board;
 
   const aboutImageUrl = aboutImage
     ? getSupabaseImageUrl(aboutImage.path, aboutImage.updated_at)
-    : FALLBACK_IMAGE_URL;
+    : "https://images.unsplash.com/photo-1516280440614-37939bbacd81?q=80&w=1200&auto=format&fit=crop";
+
+  const membersImageUrl = membersImage
+    ? getSupabaseImageUrl(membersImage.path, membersImage.updated_at)
+    : "";
 
   const pageTitle =
     content.about_page_title || "Une histoire de passion et de partage.";
@@ -69,6 +82,13 @@ export default async function AboutPage() {
 
   const quote =
     content.about_quote || "La musique nous rassemble, une voix après l’autre.";
+
+  const membersTitle =
+    content.about_members_title || "Les visages de la chorale";
+
+  const membersText =
+    content.about_members_text ||
+    "Découvrez les membres qui font vivre la Chorale Rayon de Soleil au fil des répétitions, concerts et moments partagés.";
 
   return (
     <>
@@ -95,12 +115,9 @@ export default async function AboutPage() {
 
             <Reveal delay={0.1}>
               <div className="overflow-hidden rounded-[2.2rem] border border-[#e6e1d6] bg-white p-3 shadow-sm">
-                <Image
+                <img
                   src={aboutImageUrl}
                   alt={aboutImage?.alt_text || "Membres de la chorale"}
-                  width={800}
-                  height={420}
-                  unoptimized
                   className="h-[420px] w-full rounded-[1.8rem] object-cover"
                 />
               </div>
@@ -167,6 +184,39 @@ export default async function AboutPage() {
             </div>
           </div>
         </section>
+
+        {membersImageUrl && (
+          <section className="section-space">
+            <div className="page-shell">
+              <Reveal>
+                <div className="grid gap-8 rounded-[2.2rem] border border-[#e6e1d6] bg-white p-6 shadow-sm sm:p-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-center">
+                  <div>
+                    <p className="eyebrow">Membres</p>
+
+                    <h2 className="editorial-title mt-4 text-4xl leading-tight text-[#1f1f1a] sm:text-5xl">
+                      {membersTitle}
+                    </h2>
+
+                    <p className="mt-5 text-base leading-8 text-[#6d6b63]">
+                      {membersText}
+                    </p>
+                  </div>
+
+                  <div className="overflow-hidden rounded-[1.8rem] border border-[#e6e1d6] bg-[#f7f5ef]">
+                    <img
+                      src={membersImageUrl}
+                      alt={
+                        membersImage?.alt_text ||
+                        "Trombinoscope des membres de la chorale"
+                      }
+                      className="w-full object-cover"
+                    />
+                  </div>
+                </div>
+              </Reveal>
+            </div>
+          </section>
+        )}
       </main>
 
       <Footer />
