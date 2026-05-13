@@ -30,18 +30,17 @@ export async function POST(request: Request) {
     .eq("email", email.toLowerCase())
     .single();
 
-  if (error || !admin) {
-    return NextResponse.json(
-      { message: "Invalid email or password." },
-      { status: 401 },
-    );
-  }
+  // Always run bcrypt to prevent timing-based email enumeration.
+  const DUMMY_HASH =
+    "$2b$12$invalidhashfortimingattackXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+  const passwordMatches = await bcrypt.compare(
+    password,
+    admin?.password_hash ?? DUMMY_HASH,
+  );
 
-  const passwordMatches = await bcrypt.compare(password, admin.password_hash);
-
-  if (!passwordMatches) {
+  if (error || !admin || !passwordMatches) {
     return NextResponse.json(
-      { message: "Invalid email or password." },
+      { message: "Email ou mot de passe incorrect." },
       { status: 401 },
     );
   }

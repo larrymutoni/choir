@@ -1,16 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fff8ec;
-  --foreground: #141414;
+  --background: #f7f5ef;
+  --foreground: #1f1f1a;
 
-  --cream: #fff8ec;
-  --cream-strong: #fff1df;
-  --orange: #e9552f;
-  --gold: #f4b321;
-  --dark: #202020;
-  --muted: #675e56;
-  --border-soft: #e8ded2;
+  --ivory: #f7f5ef;
+  --sage: #c7d3bf;
+  --olive: #687a5e;
+  --soft-gold: #d8bf7a;
+  --charcoal: #1f1f1a;
+
+  --muted: #6d6b63;
+  --border-soft: #e6e1d6;
+  --surface: #ffffff;
+  --surface-alt: #f3f0e8;
 }
 
 * {
@@ -25,7 +28,18 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-playfair), Georgia, serif;
+  letter-spacing: -0.035em;
 }
 
 button,
@@ -36,6 +50,50 @@ select {
 }
 
 a {
-  color: inherit;
   text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+}
+
+::selection {
+  background: rgba(104, 122, 94, 0.18);
+}
+
+.page-shell {
+  @apply mx-auto max-w-7xl px-5 sm:px-6 lg:px-8;
+}
+
+.section-space {
+  @apply py-14 sm:py-16 lg:py-20;
+}
+
+.editorial-title {
+  font-family: var(--font-playfair), Georgia, serif;
+  letter-spacing: -0.045em;
+}
+
+.eyebrow {
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--olive);
+}
+
+.soft-card {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--border-soft);
+  box-shadow:
+    0 12px 36px rgba(31, 31, 26, 0.045),
+    0 2px 8px rgba(31, 31, 26, 0.035);
+}
+
+.hero-photo-frame {
+  border-radius: 42% 58% 45% 55% / 34% 38% 62% 66%;
+}
+
+.gallery-feature-frame {
+  border-radius: 2.1rem;
 }

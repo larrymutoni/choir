@@ -3,16 +3,11 @@ import { AdminHeader } from "@/components/admin/AdminHeader";
 import { EventActions } from "@/components/admin/EventActions";
 import { EventForm } from "@/components/admin/EventForm";
 import { createAdminClient } from "@/lib/supabase/admin";
-
-function formatDate(date: string) {
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(new Date(date));
-}
+import { requirePermission } from "@/lib/auth";
+import { formatDate } from "@/lib/utils";
 
 export default async function AdminEventsPage() {
+  const admin = await requirePermission("events");
   const supabase = createAdminClient();
 
   const { data: events, error } = await supabase
@@ -29,6 +24,7 @@ export default async function AdminEventsPage() {
       <AdminHeader
         title="Événements"
         description="Gérer les concerts, répétitions ouvertes et dates importantes."
+        email={admin.email}
       />
 
       <div className="grid gap-6 xl:grid-cols-[1fr_420px]">

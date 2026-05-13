@@ -2,8 +2,10 @@ import { AdminHeader } from "@/components/admin/AdminHeader";
 import { ImageSlotCard } from "@/components/admin/ImageSlotCard";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSupabaseImageUrl } from "@/lib/images";
+import { requirePermission } from "@/lib/auth";
 
 export default async function AdminImagesPage() {
+  const admin = await requirePermission("images");
   const supabase = createAdminClient();
 
   const { data: images, error } = await supabase
@@ -20,6 +22,7 @@ export default async function AdminImagesPage() {
       <AdminHeader
         title="Images site"
         description="Remplacer les images principales utilisées sur les pages publiques."
+        email={admin.email}
       />
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">

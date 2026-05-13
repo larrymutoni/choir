@@ -12,6 +12,7 @@ export function GalleryUploadForm() {
   const [category, setCategory] = useState("Concerts");
   const [position, setPosition] = useState("0");
   const [file, setFile] = useState<File | null>(null);
+  const [fileInputKey, setFileInputKey] = useState(0);
 
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -55,6 +56,7 @@ export function GalleryUploadForm() {
     setCategory("Concerts");
     setPosition("0");
     setFile(null);
+    setFileInputKey((k) => k + 1);
     setMessage("Image ajoutée à la galerie.");
     router.refresh();
   }
@@ -70,6 +72,7 @@ export function GalleryUploadForm() {
         <div>
           <label className="text-sm font-black text-[#141414]">Image</label>
           <input
+            key={fileInputKey}
             required
             type="file"
             accept="image/png,image/jpeg,image/webp"

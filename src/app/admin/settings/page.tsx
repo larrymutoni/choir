@@ -1,15 +1,22 @@
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { SettingsForm } from "@/components/admin/SettingsForm";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requirePermission } from "@/lib/auth";
+import {
+  DEFAULT_CONTACT_ADDRESS,
+  DEFAULT_CONTACT_EMAIL,
+  DEFAULT_GOOGLE_FORM_URL,
+} from "@/lib/constants";
 
 export default async function AdminSettingsPage() {
+  const admin = await requirePermission("settings");
   const supabase = createAdminClient();
 
   const { data, error } = await supabase
     .from("contact_settings")
     .select("email, phone, address, google_form_url")
     .limit(1)
-    .single();
+    .maybeSingle();
 
   if (error) {
     throw new Error(error.message);
@@ -20,14 +27,15 @@ export default async function AdminSettingsPage() {
       <AdminHeader
         title="Paramètres"
         description="Modifier les informations de contact et le lien du formulaire."
+        email={admin.email}
       />
 
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
         <SettingsForm
-          email={data?.email ?? "contact@chorale-soleil.fr"}
+          email={data?.email ?? DEFAULT_CONTACT_EMAIL}
           phone={data?.phone ?? ""}
-          address={data?.address ?? "Lyon 6e arrondissement"}
-          googleFormUrl={data?.google_form_url ?? "https://forms.google.com"}
+          address={data?.address ?? DEFAULT_CONTACT_ADDRESS}
+          googleFormUrl={data?.google_form_url ?? DEFAULT_GOOGLE_FORM_URL}
         />
 
         <aside className="rounded-[2rem] bg-[#202020] p-6 text-white shadow-sm">

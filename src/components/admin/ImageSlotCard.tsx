@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 
@@ -66,12 +67,15 @@ export function ImageSlotCard({
 
   return (
     <article className="overflow-hidden rounded-[2rem] border border-[#e8ded2] bg-white shadow-sm">
-      <div className="aspect-[16/10] bg-[#fff8ec]">
+      <div className="relative aspect-[16/10] bg-[#fff8ec]">
         {imageUrl ? (
-          <img
+          <Image
             src={imageUrl}
             alt={altText || label}
-            className="h-full w-full object-cover"
+            fill
+            unoptimized
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, 50vw"
           />
         ) : (
           <div className="flex h-full items-center justify-center text-sm font-bold text-[#675e56]">
