@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SUPABASE_IMAGE_BUCKET } from "@/lib/constants";
 
@@ -22,7 +22,6 @@ const updateGallerySchema = z.object({
 
 const deleteGallerySchema = z.object({
   id: z.string().uuid(),
-  path: z.string().min(1),
 });
 
 function safeFileName(name: string) {
@@ -36,7 +35,7 @@ function safeFileName(name: string) {
 }
 
 export async function POST(request: Request) {
-  await requireAdmin();
+  await requirePermission("gallery");
 
   const formData = await request.formData();
 
@@ -107,7 +106,7 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  await requireAdmin();
+  await requirePermission("gallery");
 
   const body = await request.json();
   const parsed = updateGallerySchema.safeParse(body);
@@ -139,7 +138,7 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  await requireAdmin();
+  await requirePermission("gallery");
 
   const body = await request.json();
   const parsed = deleteGallerySchema.safeParse(body);
@@ -153,6 +152,16 @@ export async function DELETE(request: Request) {
 
   const supabase = createAdminClient();
 
+  const { data: imageRecord, error: fetchError } = await supabase
+    .from("gallery_images")
+    .select("path")
+    .eq("id", parsed.data.id)
+    .single();
+
+  if (fetchError || !imageRecord) {
+    return NextResponse.json({ message: "Image not found." }, { status: 404 });
+  }
+
   const { error: deleteDbError } = await supabase
     .from("gallery_images")
     .delete()
@@ -165,7 +174,13 @@ export async function DELETE(request: Request) {
     );
   }
 
-  await supabase.storage.from(SUPABASE_IMAGE_BUCKET).remove([parsed.data.path]);
+  const { error: storageError } = await supabase.storage
+    .from(SUPABASE_IMAGE_BUCKET)
+    .remove([imageRecord.path]);
+
+  if (storageError) {
+    console.error("Storage deletion failed:", storageError.message);
+  }
 
   return NextResponse.json({
     ok: true,

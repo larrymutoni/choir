@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const updateSettingsSchema = z.object({
@@ -11,7 +11,7 @@ const updateSettingsSchema = z.object({
 });
 
 export async function PUT(request: Request) {
-  await requireAdmin();
+  await requirePermission("settings");
 
   const body = await request.json();
   const parsed = updateSettingsSchema.safeParse(body);

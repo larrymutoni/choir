@@ -5,13 +5,11 @@ import { useRouter } from "next/navigation";
 
 type GalleryImageActionsProps = {
   id: string;
-  path: string;
   isVisible: boolean;
 };
 
 export function GalleryImageActions({
   id,
-  path,
   isVisible,
 }: GalleryImageActionsProps) {
   const router = useRouter();
@@ -20,7 +18,7 @@ export function GalleryImageActions({
   async function toggleVisibility() {
     setIsLoading(true);
 
-    await fetch("/api/admin/gallery", {
+    const response = await fetch("/api/admin/gallery", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -30,6 +28,9 @@ export function GalleryImageActions({
     });
 
     setIsLoading(false);
+
+    if (!response.ok) return;
+
     router.refresh();
   }
 
@@ -42,13 +43,16 @@ export function GalleryImageActions({
 
     setIsLoading(true);
 
-    await fetch("/api/admin/gallery", {
+    const response = await fetch("/api/admin/gallery", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, path }),
+      body: JSON.stringify({ id }),
     });
 
     setIsLoading(false);
+
+    if (!response.ok) return;
+
     router.refresh();
   }
 

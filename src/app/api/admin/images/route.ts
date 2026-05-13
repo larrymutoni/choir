@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SUPABASE_IMAGE_BUCKET } from "@/lib/constants";
 
@@ -10,7 +10,7 @@ const replaceImageSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  await requireAdmin();
+  await requirePermission("images");
 
   const formData = await request.formData();
 

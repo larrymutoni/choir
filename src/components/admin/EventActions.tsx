@@ -15,7 +15,7 @@ export function EventActions({ id, isVisible }: EventActionsProps) {
   async function toggleVisibility() {
     setIsLoading(true);
 
-    await fetch("/api/admin/events", {
+    const response = await fetch("/api/admin/events", {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -27,6 +27,9 @@ export function EventActions({ id, isVisible }: EventActionsProps) {
     });
 
     setIsLoading(false);
+
+    if (!response.ok) return;
+
     router.refresh();
   }
 
@@ -39,7 +42,7 @@ export function EventActions({ id, isVisible }: EventActionsProps) {
 
     setIsLoading(true);
 
-    await fetch("/api/admin/events", {
+    const response = await fetch("/api/admin/events", {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
@@ -48,6 +51,9 @@ export function EventActions({ id, isVisible }: EventActionsProps) {
     });
 
     setIsLoading(false);
+
+    if (!response.ok) return;
+
     router.refresh();
   }
 

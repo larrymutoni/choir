@@ -1,10 +1,18 @@
+import Image from "next/image";
+import { Mail, MapPin, Phone, Send } from "lucide-react";
 import { Footer } from "@/components/public/Footer";
 import { Navbar } from "@/components/public/Navbar";
 import { Button } from "@/components/ui/Button";
+import { Reveal } from "@/components/ui/Reveal";
 import { contentArrayToMap } from "@/lib/content";
-import { getSupabaseImageUrl } from "@/lib/images";
+import { buildImageMap, getSupabaseImageUrl } from "@/lib/images";
 import { createClient } from "@/lib/supabase/server";
-import { Mail, MapPin, Music2, Send } from "lucide-react";
+import {
+  DEFAULT_CONTACT_ADDRESS,
+  DEFAULT_CONTACT_EMAIL,
+  DEFAULT_GOOGLE_FORM_URL,
+  FALLBACK_IMAGE_URL,
+} from "@/lib/constants";
 
 export default async function ContactPage() {
   const supabase = await createClient();
@@ -25,144 +33,121 @@ export default async function ContactPage() {
 
   const content = contentArrayToMap(siteContent);
 
-  const imageMap = (siteImages ?? []).reduce<
-    Record<string, { path: string; alt_text: string; updated_at: string }>
-  >((acc, image) => {
-    acc[image.key] = {
-      path: image.path,
-      alt_text: image.alt_text,
-      updated_at: image.updated_at,
-    };
-
-    return acc;
-  }, {});
+  const imageMap = buildImageMap(siteImages);
 
   const contactImage = imageMap.contact_banner;
 
   const contactImageUrl = contactImage
     ? getSupabaseImageUrl(contactImage.path, contactImage.updated_at)
-    : "https://images.unsplash.com/photo-1516280440614-37939bbacd81?q=80&w=1200&auto=format&fit=crop";
+    : FALLBACK_IMAGE_URL;
 
   const contactIntro =
-    content.contact_intro ??
+    content.contact_intro ||
     "Pour une inscription, une question ou une demande d’information, contactez la chorale.";
 
-  const email = contactSettings?.email || "contact@chorale-soleil.fr";
+  const email = contactSettings?.email || DEFAULT_CONTACT_EMAIL;
   const phone = contactSettings?.phone || "";
-  const address = contactSettings?.address || "Lyon 6e arrondissement";
+  const address = contactSettings?.address || DEFAULT_CONTACT_ADDRESS;
   const googleFormUrl =
-    contactSettings?.google_form_url || "https://forms.google.com";
+    contactSettings?.google_form_url || DEFAULT_GOOGLE_FORM_URL;
+
+  const mapQuery = encodeURIComponent(address);
 
   return (
     <>
       <Navbar />
 
       <main>
-        <section className="bg-[#fff8ec] py-16 sm:py-24">
-          <div className="mx-auto grid max-w-7xl gap-12 px-5 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-center lg:px-8">
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.18em] text-[#e9552f]">
-                Contact
-              </p>
+        <section className="section-space">
+          <div className="page-shell grid gap-10 lg:grid-cols-[0.86fr_1.14fr] lg:items-center">
+            <Reveal>
+              <p className="eyebrow">Contact</p>
 
-              <h1 className="mt-5 max-w-4xl text-5xl font-black leading-[1.03] tracking-[-0.04em] text-[#141414] sm:text-6xl">
-                Contacter ou rejoindre la chorale.
+              <h1 className="editorial-title mt-5 max-w-3xl text-5xl leading-tight text-[#1f1f1a] sm:text-6xl">
+                Écrire à la chorale.
               </h1>
 
-              <p className="mt-7 max-w-2xl text-lg leading-8 text-[#675e56]">
+              <p className="mt-6 max-w-xl text-base leading-8 text-[#6d6b63] sm:text-lg">
                 {contactIntro}
               </p>
-            </div>
 
-            <div className="aspect-[5/4] overflow-hidden rounded-[2.5rem] bg-[#f4b321] shadow-xl">
-              <img
-                src={contactImageUrl}
-                alt={contactImage?.alt_text || "Contact chorale"}
-                className="h-full w-full object-cover"
-              />
-            </div>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Button href={googleFormUrl}>
+                  <Send size={17} />
+                  Ouvrir le formulaire
+                </Button>
+                <Button href={`mailto:${email}`} variant="secondary">
+                  Envoyer un email
+                </Button>
+              </div>
+            </Reveal>
+
+            <Reveal delay={0.1}>
+              <div className="overflow-hidden rounded-[2.4rem] border border-[#e6e1d6] bg-white p-3 shadow-sm">
+                <Image
+                  src={contactImageUrl}
+                  alt={contactImage?.alt_text || "Contact chorale"}
+                  width={800}
+                  height={390}
+                  unoptimized
+                  className="h-[390px] w-full rounded-[2rem] object-cover"
+                />
+              </div>
+            </Reveal>
           </div>
         </section>
 
-        <section className="bg-white py-20 sm:py-28">
-          <div className="mx-auto grid max-w-7xl gap-8 px-5 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
-            <div className="rounded-[2rem] bg-[#202020] p-8 text-white sm:p-10">
-              <h2 className="text-3xl font-black">Informations</h2>
+        <section className="section-space pt-0">
+          <div className="page-shell grid gap-6 lg:grid-cols-[0.78fr_1.22fr]">
+            <Reveal>
+              <div className="rounded-[2rem] bg-[#1f1f1a] p-7 text-white shadow-sm">
+                <h2 className="editorial-title text-3xl">Infos pratiques</h2>
 
-              <div className="mt-8 grid gap-6">
-                <div className="flex gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#e9552f]">
-                    <MapPin size={22} />
-                  </div>
-                  <div>
-                    <p className="font-black">Lieu</p>
-                    <p className="mt-1 text-white/70">{address}</p>
-                  </div>
-                </div>
+                <div className="mt-7 grid gap-5">
+                  <p className="flex gap-4">
+                    <MapPin className="mt-1 text-[#d8bf7a]" size={21} />
+                    <span>
+                      <span className="block font-semibold">Adresse</span>
+                      <span className="mt-1 block text-white/70">
+                        {address}
+                      </span>
+                    </span>
+                  </p>
 
-                <div className="flex gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#f4b321] text-[#202020]">
-                    <Mail size={22} />
-                  </div>
-                  <div>
-                    <p className="font-black">Email</p>
-                    <p className="mt-1 text-white/70">{email}</p>
-                  </div>
-                </div>
+                  <p className="flex gap-4">
+                    <Mail className="mt-1 text-[#d8bf7a]" size={21} />
+                    <span>
+                      <span className="block font-semibold">Email</span>
+                      <span className="mt-1 block text-white/70">{email}</span>
+                    </span>
+                  </p>
 
-                {phone && (
-                  <div className="flex gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10">
-                      <Music2 size={22} />
-                    </div>
-                    <div>
-                      <p className="font-black">Téléphone</p>
-                      <p className="mt-1 text-white/70">{phone}</p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10">
-                    <Music2 size={22} />
-                  </div>
-                  <div>
-                    <p className="font-black">Répétitions</p>
-                    <p className="mt-1 text-white/70">
-                      Informations communiquées après contact.
+                  {phone && (
+                    <p className="flex gap-4">
+                      <Phone className="mt-1 text-[#d8bf7a]" size={21} />
+                      <span>
+                        <span className="block font-semibold">Téléphone</span>
+                        <span className="mt-1 block text-white/70">
+                          {phone}
+                        </span>
+                      </span>
                     </p>
-                  </div>
+                  )}
                 </div>
               </div>
-            </div>
+            </Reveal>
 
-            <div className="rounded-[2rem] border border-[#e8ded2] bg-[#fff8ec] p-8 sm:p-10">
-              <h2 className="text-3xl font-black text-[#141414]">
-                Envoyer un message
-              </h2>
-
-              <p className="mt-4 leading-7 text-[#675e56]">
-                Utilisez le formulaire de contact pour une inscription, une
-                question ou une demande d’information.
-              </p>
-
-              <div className="mt-8">
-                <Button href={googleFormUrl} className="gap-2">
-                  <Send size={18} />
-                  Ouvrir le formulaire
-                </Button>
+            <Reveal delay={0.1}>
+              <div className="overflow-hidden rounded-[2rem] border border-[#e6e1d6] bg-white p-3 shadow-sm">
+                <iframe
+                  title="Carte Chorale Rayon de Soleil"
+                  src={`https://www.google.com/maps?q=${mapQuery}&output=embed`}
+                  className="h-[360px] w-full rounded-[1.6rem] border-0"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
               </div>
-
-              <div className="mt-10 rounded-[1.5rem] border border-dashed border-[#e8ded2] bg-white p-6">
-                <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#e9552f]">
-                  Formulaire externe
-                </p>
-                <p className="mt-3 leading-7 text-[#675e56]">
-                  Le lien du formulaire peut être modifié depuis les paramètres
-                  admin.
-                </p>
-              </div>
-            </div>
+            </Reveal>
           </div>
         </section>
       </main>

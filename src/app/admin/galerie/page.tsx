@@ -1,10 +1,13 @@
+import Image from "next/image";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { GalleryImageActions } from "@/components/admin/GalleryImageActions";
 import { GalleryUploadForm } from "@/components/admin/GalleryUploadForm";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSupabaseImageUrl } from "@/lib/images";
+import { requirePermission } from "@/lib/auth";
 
 export default async function AdminGalleryPage() {
+  const admin = await requirePermission("gallery");
   const supabase = createAdminClient();
 
   const { data: images, error } = await supabase
@@ -24,6 +27,7 @@ export default async function AdminGalleryPage() {
       <AdminHeader
         title="Galerie"
         description="Ajouter, organiser, masquer ou supprimer les photos de la galerie."
+        email={admin.email}
       />
 
       <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
@@ -44,11 +48,14 @@ export default async function AdminGalleryPage() {
                 key={image.id}
                 className="overflow-hidden rounded-[1.5rem] border border-[#e8ded2] bg-[#fff8ec]"
               >
-                <div className="aspect-[4/3] overflow-hidden bg-white">
-                  <img
+                <div className="relative aspect-[4/3] overflow-hidden bg-white">
+                  <Image
                     src={getSupabaseImageUrl(image.path)}
                     alt={image.alt_text || image.title}
-                    className="h-full w-full object-cover"
+                    fill
+                    unoptimized
+                    className="object-cover"
+                    sizes="(max-width: 768px) 50vw, 33vw"
                   />
                 </div>
 
@@ -80,7 +87,6 @@ export default async function AdminGalleryPage() {
                   <div className="mt-4">
                     <GalleryImageActions
                       id={image.id}
-                      path={image.path}
                       isVisible={image.is_visible}
                     />
                   </div>

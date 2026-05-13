@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const createEventSchema = z.object({
@@ -25,7 +25,7 @@ const deleteEventSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  await requireAdmin();
+  await requirePermission("events");
 
   const body = await request.json();
   const parsed = createEventSchema.safeParse(body);
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json(
       { message: "Invalid event data." },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  await requireAdmin();
+  await requirePermission("events");
 
   const body = await request.json();
   const parsed = updateEventSchema.safeParse(body);
@@ -60,7 +60,7 @@ export async function PUT(request: Request) {
   if (!parsed.success) {
     return NextResponse.json(
       { message: "Invalid event update data." },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -81,7 +81,7 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  await requireAdmin();
+  await requirePermission("events");
 
   const body = await request.json();
   const parsed = deleteEventSchema.safeParse(body);
@@ -89,7 +89,7 @@ export async function DELETE(request: Request) {
   if (!parsed.success) {
     return NextResponse.json(
       { message: "Invalid event delete data." },
-      { status: 400 }
+      { status: 400 },
     );
   }
 

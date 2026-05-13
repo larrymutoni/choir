@@ -1,5 +1,21 @@
 import { SUPABASE_IMAGE_BUCKET } from "@/lib/constants";
 
+type SiteImageRow = {
+  key: string;
+  path: string;
+  alt_text: string;
+  updated_at: string;
+};
+
+export function buildImageMap(
+  images: SiteImageRow[] | null,
+): Record<string, SiteImageRow> {
+  return (images ?? []).reduce<Record<string, SiteImageRow>>((acc, image) => {
+    acc[image.key] = image;
+    return acc;
+  }, {});
+}
+
 export function getSupabaseImageUrl(
   path: string | null | undefined,
   version?: string | null,

@@ -1,6 +1,20 @@
 import { cookies } from "next/headers";
 import { jwtVerify, SignJWT } from "jose";
 import { redirect } from "next/navigation";
+import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  normalizePermissions,
+  type AdminPermissionKey,
+  type AdminPermissions,
+} from "@/lib/permissions";
+
+export type { AdminPermissionKey, AdminPermissions };
+export {
+  DEFAULT_ADMIN_PERMISSIONS,
+  SUPER_ADMIN_PERMISSIONS,
+  PERMISSION_LABELS,
+  normalizePermissions,
+} from "@/lib/permissions";
 
 const ADMIN_COOKIE_NAME = "chorale_admin_session";
 
@@ -8,6 +22,13 @@ type AdminSessionPayload = {
   adminId: string;
   email: string;
   role: string;
+};
+
+export type CurrentAdmin = {
+  id: string;
+  email: string;
+  role: string;
+  permissions: AdminPermissions;
 };
 
 function getAuthSecret() {
@@ -61,14 +82,69 @@ export async function getAdminSession() {
   }
 }
 
-export async function requireAdmin() {
+export async function getCurrentAdmin(): Promise<CurrentAdmin | null> {
   const session = await getAdminSession();
 
-  if (!session) {
+  if (!session) return null;
+
+  const supabase = createAdminClient();
+
+  const { data, error } = await supabase
+    .from("admin_users")
+    .select("id, email, role, permissions")
+    .eq("id", session.adminId)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return {
+    id: data.id,
+    email: data.email,
+    role: data.role,
+    permissions: normalizePermissions(data.permissions),
+  };
+}
+
+export async function requireAdmin() {
+  const admin = await getCurrentAdmin();
+
+  if (!admin) {
     redirect("/admin/login");
   }
 
-  return session;
+  return admin;
+}
+
+export async function requireSuperAdmin() {
+  const admin = await requireAdmin();
+
+  if (admin.role !== "super_admin") {
+    redirect("/admin");
+  }
+
+  return admin;
+}
+
+export async function requirePermission(permission: AdminPermissionKey) {
+  const admin = await requireAdmin();
+
+  if (admin.role === "super_admin") {
+    return admin;
+  }
+
+  if (!admin.permissions[permission]) {
+    redirect("/admin");
+  }
+
+  return admin;
+}
+
+export function canAccess(admin: CurrentAdmin, permission: AdminPermissionKey) {
+  if (admin.role === "super_admin") return true;
+
+  return admin.permissions[permission];
 }
 
 export async function clearAdminSession() {
