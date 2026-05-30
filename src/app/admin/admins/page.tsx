@@ -4,10 +4,18 @@ import { AdminUserForm } from "@/components/admin/AdminUserForm";
 import {
   DEFAULT_ADMIN_PERMISSIONS,
   normalizePermissions,
-  requireSuperAdmin,
   type AdminPermissions,
-} from "@/lib/auth";
+} from "@/lib/permissions";
+import { requireSuperAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+
+type AdminUserRow = {
+  id: string;
+  email: string;
+  role: string;
+  permissions: AdminPermissions | null;
+  created_at: string;
+};
 
 export default async function AdminUsersPage() {
   const currentAdmin = await requireSuperAdmin();
@@ -26,13 +34,13 @@ export default async function AdminUsersPage() {
     <main>
       <AdminHeader
         title="Administrateurs"
-        description="Créer des comptes et contrôler leurs accès."
+        description="Créer des comptes admin et gérer leurs accès."
         email={currentAdmin.email}
       />
 
       <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
         <section className="grid gap-4">
-          {(admins ?? []).map((admin) => (
+          {((admins as AdminUserRow[] | null) ?? []).map((admin) => (
             <article
               key={admin.id}
               className="rounded-[1.8rem] border border-[#e6e1d6] bg-white p-6 shadow-sm"
@@ -61,7 +69,9 @@ export default async function AdminUsersPage() {
                 id={admin.id}
                 currentUserId={currentAdmin.id}
                 role={admin.role}
-                permissions={normalizePermissions(admin.permissions)}
+                permissions={normalizePermissions(
+                  admin.permissions ?? DEFAULT_ADMIN_PERMISSIONS,
+                )}
               />
             </article>
           ))}

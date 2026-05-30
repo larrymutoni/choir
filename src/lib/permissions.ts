@@ -4,7 +4,8 @@ export type AdminPermissionKey =
   | "gallery"
   | "events"
   | "settings"
-  | "admins";
+  | "admins"
+  | "messages";
 
 export type AdminPermissions = Record<AdminPermissionKey, boolean>;
 
@@ -15,6 +16,7 @@ export const DEFAULT_ADMIN_PERMISSIONS: AdminPermissions = {
   events: false,
   settings: false,
   admins: false,
+  messages: false,
 };
 
 export const SUPER_ADMIN_PERMISSIONS: AdminPermissions = {
@@ -24,6 +26,7 @@ export const SUPER_ADMIN_PERMISSIONS: AdminPermissions = {
   events: true,
   settings: true,
   admins: true,
+  messages: true,
 };
 
 export const PERMISSION_LABELS: Record<AdminPermissionKey, string> = {
@@ -33,6 +36,7 @@ export const PERMISSION_LABELS: Record<AdminPermissionKey, string> = {
   events: "Événements",
   settings: "Paramètres",
   admins: "Admins",
+  messages: "Messages",
 };
 
 export function normalizePermissions(value: unknown): AdminPermissions {
@@ -49,5 +53,6 @@ export function normalizePermissions(value: unknown): AdminPermissions {
     events: Boolean(raw.events),
     settings: Boolean(raw.settings),
     admins: Boolean(raw.admins),
+    messages: Boolean(raw.messages),
   };
 }

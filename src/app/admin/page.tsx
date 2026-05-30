@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   CalendarDays,
   ImageIcon,
+  Mail,
   Settings,
   ShieldCheck,
   Type,
@@ -33,14 +34,21 @@ const allActions = [
   },
   {
     title: "Événements",
-    text: "Gérer les concerts et dates importantes.",
+    text: "Gérer les dates affichées dans la page Activités.",
     href: "/admin/evenements",
     icon: CalendarDays,
     permission: "events" as const,
   },
   {
+    title: "Messages",
+    text: "Lire les messages envoyés depuis le formulaire contact.",
+    href: "/admin/messages",
+    icon: Mail,
+    permission: "messages" as const,
+  },
+  {
     title: "Paramètres",
-    text: "Email, téléphone, adresse et formulaire.",
+    text: "Email, téléphone, adresse et informations de contact.",
     href: "/admin/settings",
     icon: Settings,
     permission: "settings" as const,
@@ -93,24 +101,6 @@ export default async function AdminDashboardPage() {
             </Link>
           );
         })}
-      </section>
-
-      <section className="mt-5 rounded-[1.7rem] border border-[#e6e1d6] bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-lg font-black text-[#1f1f1a]">Site public</h2>
-            <p className="mt-1 text-sm leading-6 text-[#6d6b63]">
-              Vérifier le rendu après modification.
-            </p>
-          </div>
-
-          <Link
-            href="/"
-            className="inline-flex justify-center rounded-full bg-[#687a5e] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#56664d]"
-          >
-            Voir le site
-          </Link>
-        </div>
       </section>
     </main>
   );

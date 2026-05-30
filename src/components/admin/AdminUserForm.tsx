@@ -12,6 +12,7 @@ const defaultPermissions: AdminPermissions = {
   events: false,
   settings: false,
   admins: false,
+  messages: false,
 };
 
 export function AdminUserForm() {

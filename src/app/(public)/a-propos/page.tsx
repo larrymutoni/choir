@@ -1,7 +1,6 @@
-import { Heart, Music2, Sparkles, Users } from "lucide-react";
+import { Heart, Mic2, Music2, Sparkles, Users } from "lucide-react";
 import { Footer } from "@/components/public/Footer";
 import { Navbar } from "@/components/public/Navbar";
-import { Button } from "@/components/ui/Button";
 import { Reveal } from "@/components/ui/Reveal";
 import { contentArrayToMap } from "@/lib/content";
 import { getSupabaseImageUrl } from "@/lib/images";
@@ -54,11 +53,16 @@ export default async function AboutPage() {
   }, {});
 
   const aboutImage = imageMap.about_main;
+  const directorImage = imageMap.choir_director;
   const membersImage = imageMap.members_board;
 
   const aboutImageUrl = aboutImage
     ? getSupabaseImageUrl(aboutImage.path, aboutImage.updated_at)
     : "https://images.unsplash.com/photo-1516280440614-37939bbacd81?q=80&w=1200&auto=format&fit=crop";
+
+  const directorImageUrl = directorImage
+    ? getSupabaseImageUrl(directorImage.path, directorImage.updated_at)
+    : "";
 
   const membersImageUrl = membersImage
     ? getSupabaseImageUrl(membersImage.path, membersImage.updated_at)
@@ -77,6 +81,12 @@ export default async function AboutPage() {
   const storyText =
     content.about_story_text ||
     "La Chorale Rayon de Soleil est un espace musical et humain. On y vient pour chanter, progresser, écouter les autres et partager des moments simples autour d’un répertoire varié.";
+
+  const directorTitle = content.about_choir_director_title || "Chef de chœur";
+
+  const directorText =
+    content.about_choir_director_text ||
+    "Le chef de chœur accompagne le groupe dans le travail vocal, le rythme et l’interprétation des chants.";
 
   const valuesTitle = content.about_values_title || "Ce qui nous rassemble";
 
@@ -107,10 +117,6 @@ export default async function AboutPage() {
               <p className="mt-6 max-w-xl text-base leading-8 text-[#6d6b63] sm:text-lg">
                 {intro}
               </p>
-
-              <div className="mt-8">
-                <Button href="/contact">Nous rejoindre</Button>
-              </div>
             </Reveal>
 
             <Reveal delay={0.1}>
@@ -131,6 +137,7 @@ export default async function AboutPage() {
               <div className="grid gap-8 rounded-[2.2rem] border border-[#e6e1d6] bg-white p-8 shadow-sm sm:p-10 lg:grid-cols-[0.8fr_1.2fr]">
                 <div>
                   <p className="eyebrow">Notre histoire</p>
+
                   <h2 className="editorial-title mt-4 text-4xl leading-tight text-[#1f1f1a] sm:text-5xl">
                     {storyTitle}
                   </h2>
@@ -150,11 +157,54 @@ export default async function AboutPage() {
           </div>
         </section>
 
+        <section className="section-space pt-0">
+          <div className="page-shell">
+            <Reveal>
+              <div className="grid overflow-hidden rounded-[2.2rem] border border-[#e6e1d6] bg-white shadow-sm lg:grid-cols-[0.9fr_1.1fr]">
+                <div className="p-8 sm:p-10">
+                  <p className="eyebrow">Direction musicale</p>
+
+                  <h2 className="editorial-title mt-4 text-4xl leading-tight text-[#1f1f1a] sm:text-5xl">
+                    {directorTitle}
+                  </h2>
+
+                  <div className="mt-6 flex gap-5">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#f3f0e8] text-[#687a5e]">
+                      <Mic2 size={24} />
+                    </div>
+
+                    <p className="text-base leading-8 text-[#6d6b63]">
+                      {directorText}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="min-h-[320px] bg-[#f3f0e8]">
+                  {directorImageUrl ? (
+                    <img
+                      src={directorImageUrl}
+                      alt={
+                        directorImage?.alt_text || "Chef de chœur de la chorale"
+                      }
+                      className="h-full min-h-[320px] w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full min-h-[320px] items-center justify-center p-8 text-center text-sm text-[#6d6b63]">
+                      Photo du chef de chœur à ajouter depuis l’administration.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
         <section className="section-space bg-white/55">
           <div className="page-shell">
             <Reveal>
               <div className="mb-8 max-w-3xl">
                 <p className="eyebrow">Valeurs</p>
+
                 <h2 className="editorial-title mt-4 text-4xl leading-tight sm:text-5xl">
                   {valuesTitle}
                 </h2>

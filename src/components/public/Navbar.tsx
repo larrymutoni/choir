@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
 import { PUBLIC_NAV_ITEMS } from "@/lib/constants";
@@ -14,13 +13,10 @@ export function Navbar() {
     <header className="sticky top-0 z-50 border-b border-[#e6e1d6]/80 bg-[#f7f5ef]/92 backdrop-blur-xl">
       <div className="page-shell flex h-24 items-center justify-between">
         <Link href="/" className="flex items-center">
-          <Image
+          <img
             src="/images/logo-chorale.png"
             alt="Chorale Rayon de Soleil Lyon 6"
-            width={136}
-            height={54}
-            style={{ height: "auto" }}
-            className="w-[118px] object-contain sm:w-[136px]"
+            className="h-auto w-[118px] object-contain sm:w-[136px]"
           />
         </Link>
 
@@ -37,7 +33,9 @@ export function Navbar() {
         </nav>
 
         <div className="hidden lg:block">
-          <Button href="/contact">Nous rejoindre</Button>
+          <Button href="/admin/login" variant="secondary">
+            Accès membres
+          </Button>
         </div>
 
         <button
@@ -64,8 +62,12 @@ export function Navbar() {
               </Link>
             ))}
 
-            <Button href="/contact" className="mt-3 w-full">
-              Nous rejoindre
+            <Button
+              href="/admin/login"
+              variant="secondary"
+              className="mt-3 w-full"
+            >
+              Accès membres
             </Button>
           </nav>
         </div>

@@ -8,14 +8,6 @@ import {
   type AdminPermissions,
 } from "@/lib/permissions";
 
-export type { AdminPermissionKey, AdminPermissions };
-export {
-  DEFAULT_ADMIN_PERMISSIONS,
-  SUPER_ADMIN_PERMISSIONS,
-  PERMISSION_LABELS,
-  normalizePermissions,
-} from "@/lib/permissions";
-
 const ADMIN_COOKIE_NAME = "chorale_admin_session";
 
 type AdminSessionPayload = {
