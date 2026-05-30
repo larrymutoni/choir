@@ -75,12 +75,6 @@ export default async function HomePage() {
                 <p className="mt-6 max-w-xl text-base leading-8 text-[#5d5a52] sm:text-lg">
                   {heroDescription}
                 </p>
-
-                <div className="mt-8">
-                  <Button href="/a-propos" variant="secondary">
-                    Découvrir la chorale
-                  </Button>
-                </div>
               </div>
             </Reveal>
 
@@ -134,7 +128,7 @@ export default async function HomePage() {
                       Chanter, écouter, partager.
                     </h3>
                     <p className="mt-4 leading-8 text-[#6d6b63]">
-                      Une chorale, c’est plus qu’un cours de chant : c’est un
+                      Une chorale, c’est plus qu’une répétition : c’est un
                       rendez-vous régulier, une énergie collective et le plaisir
                       d’entendre les voix se construire ensemble.
                     </p>
@@ -165,7 +159,7 @@ export default async function HomePage() {
           <div className="page-shell">
             <Reveal>
               <div className="rounded-[2.4rem] border border-[#e6e1d6] bg-white p-8 text-center shadow-sm sm:p-10 lg:p-12">
-                <p className="eyebrow">Contact</p>
+                <p className="eyebrow">Rejoindre la chorale</p>
 
                 <h2 className="editorial-title mx-auto mt-4 max-w-3xl text-4xl leading-tight text-[#1f1f1a] sm:text-5xl">
                   {joinTitle}
