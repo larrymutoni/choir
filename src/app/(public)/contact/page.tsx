@@ -1,18 +1,11 @@
-import Image from "next/image";
-import { Mail, MapPin, Phone, Send } from "lucide-react";
+import { Accessibility, Mail, MapPin, Phone } from "lucide-react";
 import { Footer } from "@/components/public/Footer";
 import { Navbar } from "@/components/public/Navbar";
-import { Button } from "@/components/ui/Button";
 import { Reveal } from "@/components/ui/Reveal";
+import { ContactForm } from "@/components/public/ContactForm";
 import { contentArrayToMap } from "@/lib/content";
-import { buildImageMap, getSupabaseImageUrl } from "@/lib/images";
+import { getSupabaseImageUrl } from "@/lib/images";
 import { createClient } from "@/lib/supabase/server";
-import {
-  DEFAULT_CONTACT_ADDRESS,
-  DEFAULT_CONTACT_EMAIL,
-  DEFAULT_GOOGLE_FORM_URL,
-  FALLBACK_IMAGE_URL,
-} from "@/lib/constants";
 
 export default async function ContactPage() {
   const supabase = await createClient();
@@ -26,32 +19,51 @@ export default async function ContactPage() {
     supabase.from("site_images").select("key, path, alt_text, updated_at"),
     supabase
       .from("contact_settings")
-      .select("email, phone, address, google_form_url")
+      .select(
+        "email, admin_address, rehearsal_address, accessibility_note, monique_phone, francois_phone, show_map, map_query",
+      )
       .limit(1)
       .single(),
   ]);
 
   const content = contentArrayToMap(siteContent);
 
-  const imageMap = buildImageMap(siteImages);
+  const imageMap = (siteImages ?? []).reduce<
+    Record<string, { path: string; alt_text: string; updated_at: string }>
+  >((acc, image) => {
+    acc[image.key] = {
+      path: image.path,
+      alt_text: image.alt_text,
+      updated_at: image.updated_at,
+    };
+    return acc;
+  }, {});
 
   const contactImage = imageMap.contact_banner;
 
   const contactImageUrl = contactImage
     ? getSupabaseImageUrl(contactImage.path, contactImage.updated_at)
-    : FALLBACK_IMAGE_URL;
+    : "https://images.unsplash.com/photo-1516280440614-37939bbacd81?q=80&w=1200&auto=format&fit=crop";
 
   const contactIntro =
     content.contact_intro ||
     "Pour une inscription, une question ou une demande d’information, contactez la chorale.";
 
-  const email = contactSettings?.email || DEFAULT_CONTACT_EMAIL;
-  const phone = contactSettings?.phone || "";
-  const address = contactSettings?.address || DEFAULT_CONTACT_ADDRESS;
-  const googleFormUrl =
-    contactSettings?.google_form_url || DEFAULT_GOOGLE_FORM_URL;
-
-  const mapQuery = encodeURIComponent(address);
+  const email = contactSettings?.email || "";
+  const adminAddress =
+    contactSettings?.admin_address ||
+    "Ensemble Vocal Rayon de Soleil Lyon 6, 33 rue Bossuet, 69006 Lyon";
+  const rehearsalAddress =
+    contactSettings?.rehearsal_address || "37 rue Bossuet, 69006 Lyon";
+  const accessibility =
+    contactSettings?.accessibility_note ||
+    "Salle au sous-sol avec ascenseur pour les personnes à mobilité réduite.";
+  const moniquePhone = contactSettings?.monique_phone || "06 78 92 70 05";
+  const francoisPhone = contactSettings?.francois_phone || "";
+  const showMap = contactSettings?.show_map ?? true;
+  const mapQuery = encodeURIComponent(
+    contactSettings?.map_query || rehearsalAddress,
+  );
 
   return (
     <>
@@ -70,26 +82,13 @@ export default async function ContactPage() {
               <p className="mt-6 max-w-xl text-base leading-8 text-[#6d6b63] sm:text-lg">
                 {contactIntro}
               </p>
-
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Button href={googleFormUrl}>
-                  <Send size={17} />
-                  Ouvrir le formulaire
-                </Button>
-                <Button href={`mailto:${email}`} variant="secondary">
-                  Envoyer un email
-                </Button>
-              </div>
             </Reveal>
 
             <Reveal delay={0.1}>
               <div className="overflow-hidden rounded-[2.4rem] border border-[#e6e1d6] bg-white p-3 shadow-sm">
-                <Image
+                <img
                   src={contactImageUrl}
                   alt={contactImage?.alt_text || "Contact chorale"}
-                  width={800}
-                  height={390}
-                  unoptimized
                   className="h-[390px] w-full rounded-[2rem] object-cover"
                 />
               </div>
@@ -107,28 +106,66 @@ export default async function ContactPage() {
                   <p className="flex gap-4">
                     <MapPin className="mt-1 text-[#d8bf7a]" size={21} />
                     <span>
-                      <span className="block font-semibold">Adresse</span>
+                      <span className="block font-semibold">
+                        Adresse administrative
+                      </span>
                       <span className="mt-1 block text-white/70">
-                        {address}
+                        {adminAddress}
                       </span>
                     </span>
                   </p>
 
                   <p className="flex gap-4">
-                    <Mail className="mt-1 text-[#d8bf7a]" size={21} />
+                    <MapPin className="mt-1 text-[#d8bf7a]" size={21} />
                     <span>
-                      <span className="block font-semibold">Email</span>
-                      <span className="mt-1 block text-white/70">{email}</span>
+                      <span className="block font-semibold">
+                        Adresse des répétitions
+                      </span>
+                      <span className="mt-1 block text-white/70">
+                        {rehearsalAddress}
+                      </span>
                     </span>
                   </p>
 
-                  {phone && (
+                  <p className="flex gap-4">
+                    <Accessibility className="mt-1 text-[#d8bf7a]" size={21} />
+                    <span>
+                      <span className="block font-semibold">Accessibilité</span>
+                      <span className="mt-1 block text-white/70">
+                        {accessibility}
+                      </span>
+                    </span>
+                  </p>
+
+                  {email && (
+                    <p className="flex gap-4">
+                      <Mail className="mt-1 text-[#d8bf7a]" size={21} />
+                      <span>
+                        <span className="block font-semibold">Email</span>
+                        <span className="mt-1 block text-white/70">
+                          {email}
+                        </span>
+                      </span>
+                    </p>
+                  )}
+
+                  <p className="flex gap-4">
+                    <Phone className="mt-1 text-[#d8bf7a]" size={21} />
+                    <span>
+                      <span className="block font-semibold">Monique</span>
+                      <span className="mt-1 block text-white/70">
+                        {moniquePhone}
+                      </span>
+                    </span>
+                  </p>
+
+                  {francoisPhone && (
                     <p className="flex gap-4">
                       <Phone className="mt-1 text-[#d8bf7a]" size={21} />
                       <span>
-                        <span className="block font-semibold">Téléphone</span>
+                        <span className="block font-semibold">François</span>
                         <span className="mt-1 block text-white/70">
-                          {phone}
+                          {francoisPhone}
                         </span>
                       </span>
                     </p>
@@ -138,18 +175,28 @@ export default async function ContactPage() {
             </Reveal>
 
             <Reveal delay={0.1}>
-              <div className="overflow-hidden rounded-[2rem] border border-[#e6e1d6] bg-white p-3 shadow-sm">
-                <iframe
-                  title="Carte Chorale Rayon de Soleil"
-                  src={`https://www.google.com/maps?q=${mapQuery}&output=embed`}
-                  className="h-[360px] w-full rounded-[1.6rem] border-0"
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
-              </div>
+              <ContactForm />
             </Reveal>
           </div>
-        </section>
+        </section>  
+
+        {showMap && (
+          <section className="section-space pt-0">
+            <div className="page-shell">
+              <Reveal>
+                <div className="overflow-hidden rounded-[2rem] border border-[#e6e1d6] bg-white p-3 shadow-sm">
+                  <iframe
+                    title="Carte des répétitions"
+                    src={`https://www.google.com/maps?q=${mapQuery}&output=embed`}
+                    className="h-[360px] w-full rounded-[1.6rem] border-0"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                </div>
+              </Reveal>
+            </div>
+          </section>
+        )}
       </main>
 
       <Footer />

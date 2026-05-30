@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { requireSuperAdmin } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   DEFAULT_ADMIN_PERMISSIONS,
   SUPER_ADMIN_PERMISSIONS,
-  requireSuperAdmin,
   type AdminPermissions,
-} from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+} from "@/lib/permissions";
 
 const permissionsSchema = z.object({
   content: z.boolean(),
@@ -16,6 +16,7 @@ const permissionsSchema = z.object({
   events: z.boolean(),
   settings: z.boolean(),
   admins: z.boolean(),
+  messages: z.boolean(),
 });
 
 const createAdminSchema = z.object({

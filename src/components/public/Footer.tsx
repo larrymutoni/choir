@@ -1,6 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
-import { LockKeyhole, Mail, MapPin, Phone } from "lucide-react";
+import { Mail, MapPin, Phone } from "lucide-react";
 import { PUBLIC_NAV_ITEMS } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/server";
 
@@ -21,27 +20,16 @@ export async function Footer() {
     <footer className="mt-14 bg-[#1f1f1a] text-white">
       <div className="page-shell grid gap-10 py-10 md:grid-cols-[1.1fr_0.8fr_1.1fr]">
         <div>
-          <Image
+          <img
             src="/images/logo-chorale.png"
             alt="Chorale Rayon de Soleil Lyon 6"
-            width={135}
-            height={54}
-            style={{ height: "auto" }}
-            className="w-[135px] object-contain brightness-110"
+            className="h-auto w-[135px] object-contain brightness-110"
           />
 
           <p className="mt-5 max-w-md text-sm leading-7 text-white/68">
             Une chorale conviviale à Lyon 6, autour du plaisir de chanter
             ensemble et de partager un répertoire varié.
           </p>
-
-          <Link
-            href="/admin/login"
-            className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-4 py-2 text-xs font-medium text-white/75 transition hover:bg-white hover:text-[#1f1f1a]"
-          >
-            <LockKeyhole size={15} />
-            Accès administrateur
-          </Link>
         </div>
 
         <div>
@@ -98,9 +86,9 @@ export async function Footer() {
 
           <a
             href="mailto:larrycarnot@gmail.com"
-            className="inline-flex w-fit rounded-full border border-white/10 px-3 py-1.5 text-white/70 transition hover:bg-white hover:!text-[#1f1f1a]"
+            className="inline-flex w-fit rounded-full border border-white/10 px-3 py-1.5 text-white/70 transition hover:bg-white hover:text-[#1f1f1a]"
           >
-            Site développé par Larry Mutoni
+            Site développé par Larry
           </a>
         </div>
       </div>

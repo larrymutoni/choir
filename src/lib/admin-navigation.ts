@@ -1,4 +1,5 @@
-import { canAccess, type AdminPermissionKey, type CurrentAdmin } from "@/lib/auth";
+import { canAccess, type CurrentAdmin } from "@/lib/auth";
+import type { AdminPermissionKey } from "@/lib/permissions";
 
 export type AdminIconKey =
   | "dashboard"
@@ -6,7 +7,8 @@ export type AdminIconKey =
   | "image"
   | "calendar"
   | "settings"
-  | "admins";
+  | "admins"
+  | "messages";
 
 export type AdminNavigationItem = {
   label: string;
@@ -45,6 +47,12 @@ export const adminNavigationItems: AdminNavigationItem[] = [
     href: "/admin/evenements",
     iconKey: "calendar",
     permission: "events",
+  },
+  {
+    label: "Messages",
+    href: "/admin/messages",
+    iconKey: "messages",
+    permission: "messages",
   },
   {
     label: "Paramètres",
