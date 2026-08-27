@@ -2,78 +2,68 @@ import Link from "next/link";
 import {
   CalendarDays,
   ImageIcon,
-  Mail,
+  ListChecks,
+  MailCheck,
   Settings,
-  ShieldCheck,
   Type,
+  Users,
 } from "lucide-react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
-import { canAccess, requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 
-const allActions = [
+const actions = [
   {
     title: "Textes",
     text: "Modifier les textes importants du site.",
     href: "/admin/contenu",
     icon: Type,
-    permission: "content" as const,
   },
   {
     title: "Images",
     text: "Changer les visuels des pages publiques.",
     href: "/admin/images",
     icon: ImageIcon,
-    permission: "images" as const,
   },
   {
     title: "Galerie",
-    text: "Ajouter ou masquer les photos.",
+    text: "Gérer les photos de la chorale.",
     href: "/admin/galerie",
     icon: ImageIcon,
-    permission: "gallery" as const,
   },
   {
     title: "Événements",
-    text: "Gérer les dates affichées dans la page Activités.",
+    text: "Gérer les événements de la chorale.",
     href: "/admin/evenements",
     icon: CalendarDays,
-    permission: "events" as const,
   },
   {
-    title: "Messages",
-    text: "Lire les messages envoyés depuis le formulaire contact.",
-    href: "/admin/messages",
-    icon: Mail,
-    permission: "messages" as const,
+    title: "Utilisateurs",
+    text: "Accepter, refuser et gérer les membres.",
+    href: "/admin/utilisateurs",
+    icon: Users,
+  },
+  {
+    title: "Emails autorisés",
+    text: "Gérer les adresses autorisées à s'inscrire.",
+    href: "/admin/emails",
+    icon: MailCheck,
   },
   {
     title: "Paramètres",
-    text: "Email, téléphone, adresse et informations de contact.",
+    text: "Modifier les informations pratiques du site.",
     href: "/admin/settings",
     icon: Settings,
-    permission: "settings" as const,
-  },
-  {
-    title: "Admins",
-    text: "Créer des comptes et gérer les accès.",
-    href: "/admin/admins",
-    icon: ShieldCheck,
-    permission: "admins" as const,
   },
 ];
 
 export default async function AdminDashboardPage() {
   const admin = await requireAdmin();
 
-  const actions = allActions.filter((action) =>
-    canAccess(admin, action.permission),
-  );
-
   return (
     <main>
       <AdminHeader
         title="Dashboard"
-        description="Gérer le site de la chorale simplement."
+        description="Gérer le site de la chorale."
         email={admin.email}
       />
 

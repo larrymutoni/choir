@@ -1,58 +1,70 @@
-import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createAdminSession } from "@/lib/auth";
+import { findUserByEmail } from "@/server/auth/repository";
+import { createUserSession } from "@/server/auth/session";
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z.string().trim().email().max(254),
+  password: z.string().min(1).max(128),
 });
 
 export async function POST(request: Request) {
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = loginSchema.safeParse(body);
 
   if (!parsed.success) {
     return NextResponse.json(
-      { message: "Invalid login data." },
+      { message: "Données de connexion invalides." },
       { status: 400 },
     );
   }
 
-  const { email, password } = parsed.data;
+  try {
+    const email = parsed.data.email.toLowerCase();
+    const user = await findUserByEmail(email);
 
-  const supabase = createAdminClient();
+    if (!user) {
+      return NextResponse.json(
+        { message: "Email ou mot de passe incorrect." },
+        { status: 401 },
+      );
+    }
 
-  const { data: admin, error } = await supabase
-    .from("admin_users")
-    .select("id, email, password_hash, role")
-    .eq("email", email.toLowerCase())
-    .single();
+    const passwordValid = await bcrypt.compare(
+      parsed.data.password,
+      user.passwordHash,
+    );
 
-  // Always run bcrypt to prevent timing-based email enumeration.
-  const DUMMY_HASH =
-    "$2b$12$invalidhashfortimingattackXXXXXXXXXXXXXXXXXXXXXXXXXXX";
-  const passwordMatches = await bcrypt.compare(
-    password,
-    admin?.password_hash ?? DUMMY_HASH,
-  );
+    if (!passwordValid) {
+      return NextResponse.json(
+        { message: "Email ou mot de passe incorrect." },
+        { status: 401 },
+      );
+    }
 
-  if (error || !admin || !passwordMatches) {
+    if (
+      user.status !== "active" ||
+      (user.role !== "admin" && user.role !== "super_admin")
+    ) {
+      return NextResponse.json(
+        { message: "Accès administrateur non autorisé." },
+        { status: 403 },
+      );
+    }
+
+    await createUserSession(user.id);
+
+    return NextResponse.json({
+      ok: true,
+      message: "Connexion réussie.",
+    });
+  } catch (error) {
+    console.error("Admin login failed:", error);
+
     return NextResponse.json(
-      { message: "Email ou mot de passe incorrect." },
-      { status: 401 },
+      { message: "Connexion impossible." },
+      { status: 500 },
     );
   }
-
-  await createAdminSession({
-    adminId: admin.id,
-    email: admin.email,
-    role: admin.role,
-  });
-
-  return NextResponse.json({
-    ok: true,
-    message: "Logged in successfully.",
-  });
 }

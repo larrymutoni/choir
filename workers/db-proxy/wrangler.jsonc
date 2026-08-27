@@ -1,0 +1,12 @@
+{
+  "name": "chorale-db-proxy",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-17",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "chorale-db",
+      "database_id": "878c4404-ba89-452c-b0ca-fd20eb60c6bf"
+    }
+  ]
+}

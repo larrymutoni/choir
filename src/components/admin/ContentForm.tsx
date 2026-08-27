@@ -56,7 +56,7 @@ export function ContentForm({ items }: ContentFormProps) {
       }),
     });
 
-    const result = await response.json();
+    const result = (await response.json()) as { message?: string };
 
     setIsSaving(false);
 
