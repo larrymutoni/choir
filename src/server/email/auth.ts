@@ -1,12 +1,10 @@
 import { sendEmail } from "@/server/email/service";
 
-export async function sendPasswordResetEmail(email: string, token: string) {
-  const appUrl = process.env.APP_URL;
-
-  if (!appUrl) {
-    throw new Error("Missing APP_URL configuration.");
-  }
-
+export async function sendPasswordResetEmail(
+  email: string,
+  token: string,
+  appUrl: string,
+) {
   const resetUrl = `${appUrl}/reinitialiser-mot-de-passe?token=${encodeURIComponent(token)}`;
 
   await sendEmail({

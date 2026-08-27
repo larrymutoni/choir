@@ -27,7 +27,7 @@ async function hashToken(token: string) {
   ).join("");
 }
 
-export async function requestPasswordReset(emailInput: string) {
+export async function requestPasswordReset(emailInput: string, appUrl: string) {
   const email = emailInput.trim().toLowerCase();
 
   const user = await findUserByEmail(email);
@@ -46,7 +46,7 @@ export async function requestPasswordReset(emailInput: string) {
     expiresAt: new Date(Date.now() + RESET_DURATION_MS).toISOString(),
   });
 
-  await sendPasswordResetEmail(user.email, token);
+  await sendPasswordResetEmail(user.email, token, appUrl);
 }
 
 export async function resetPassword(token: string, password: string) {

@@ -18,7 +18,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    await requestPasswordReset(parsed.data.email);
+    const appUrl = new URL(request.url).origin;
+
+    await requestPasswordReset(parsed.data.email, appUrl);
 
     return NextResponse.json({
       ok: true,
