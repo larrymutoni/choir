@@ -1,101 +1,44 @@
-import { cookies } from "next/headers";
-import { jwtVerify, SignJWT } from "jose";
 import { redirect } from "next/navigation";
-import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  normalizePermissions,
-  type AdminPermissionKey,
-  type AdminPermissions,
-} from "@/lib/permissions";
+import { deleteCurrentSession, getCurrentSession } from "@/server/auth/session";
+import type { AdminPermissionKey, AdminPermissions } from "@/lib/permissions";
+import { SUPER_ADMIN_PERMISSIONS } from "@/lib/permissions";
 
-const ADMIN_COOKIE_NAME = "chorale_admin_session";
-
-type AdminSessionPayload = {
-  adminId: string;
-  email: string;
-  role: string;
+const ADMIN_PERMISSIONS: AdminPermissions = {
+  content: true,
+  images: true,
+  gallery: true,
+  events: true,
+  settings: true,
+  admins: false,
+  messages: true,
 };
 
 export type CurrentAdmin = {
   id: string;
   email: string;
-  role: string;
+  role: "admin" | "super_admin";
   permissions: AdminPermissions;
 };
 
-function getAuthSecret() {
-  const secret = process.env.AUTH_SECRET;
+export async function getCurrentAdmin(): Promise<CurrentAdmin | null> {
+  const session = await getCurrentSession();
 
-  if (!secret) {
-    throw new Error("AUTH_SECRET is missing.");
-  }
-
-  return new TextEncoder().encode(secret);
-}
-
-export async function createAdminSession(payload: AdminSessionPayload) {
-  const token = await new SignJWT({
-    adminId: payload.adminId,
-    email: payload.email,
-    role: payload.role,
-  })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime("7d")
-    .sign(getAuthSecret());
-
-  const cookieStore = await cookies();
-
-  cookieStore.set(ADMIN_COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7,
-  });
-}
-
-export async function getAdminSession() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(ADMIN_COOKIE_NAME)?.value;
-
-  if (!token) return null;
-
-  try {
-    const { payload } = await jwtVerify(token, getAuthSecret());
-
-    return {
-      adminId: String(payload.adminId),
-      email: String(payload.email),
-      role: String(payload.role),
-    };
-  } catch {
+  if (!session) {
     return null;
   }
-}
 
-export async function getCurrentAdmin(): Promise<CurrentAdmin | null> {
-  const session = await getAdminSession();
-
-  if (!session) return null;
-
-  const supabase = createAdminClient();
-
-  const { data, error } = await supabase
-    .from("admin_users")
-    .select("id, email, role, permissions")
-    .eq("id", session.adminId)
-    .single();
-
-  if (error || !data) {
+  if (session.role !== "admin" && session.role !== "super_admin") {
     return null;
   }
 
   return {
-    id: data.id,
-    email: data.email,
-    role: data.role,
-    permissions: normalizePermissions(data.permissions),
+    id: session.user_id,
+    email: session.email,
+    role: session.role,
+    permissions:
+      session.role === "super_admin"
+        ? SUPER_ADMIN_PERMISSIONS
+        : ADMIN_PERMISSIONS,
   };
 }
 
@@ -122,10 +65,6 @@ export async function requireSuperAdmin() {
 export async function requirePermission(permission: AdminPermissionKey) {
   const admin = await requireAdmin();
 
-  if (admin.role === "super_admin") {
-    return admin;
-  }
-
   if (!admin.permissions[permission]) {
     redirect("/admin");
   }
@@ -134,13 +73,9 @@ export async function requirePermission(permission: AdminPermissionKey) {
 }
 
 export function canAccess(admin: CurrentAdmin, permission: AdminPermissionKey) {
-  if (admin.role === "super_admin") return true;
-
   return admin.permissions[permission];
 }
 
 export async function clearAdminSession() {
-  const cookieStore = await cookies();
-
-  cookieStore.delete(ADMIN_COOKIE_NAME);
+  await deleteCurrentSession();
 }

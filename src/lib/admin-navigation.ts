@@ -49,10 +49,16 @@ export const adminNavigationItems: AdminNavigationItem[] = [
     permission: "events",
   },
   {
-    label: "Messages",
-    href: "/admin/messages",
-    iconKey: "messages",
-    permission: "messages",
+    label: "Utilisateurs",
+    href: "/admin/utilisateurs",
+    iconKey: "admins",
+    permission: null,
+  },
+  {
+    label: "Emails autorisés",
+    href: "/admin/emails",
+    iconKey: "admins",
+    permission: null,
   },
   {
     label: "Paramètres",
@@ -60,17 +66,14 @@ export const adminNavigationItems: AdminNavigationItem[] = [
     iconKey: "settings",
     permission: "settings",
   },
-  {
-    label: "Admins",
-    href: "/admin/admins",
-    iconKey: "admins",
-    permission: "admins",
-  },
 ];
 
 export function getAllowedAdminLinks(admin: CurrentAdmin) {
   return adminNavigationItems.filter((item) => {
-    if (!item.permission) return true;
+    if (!item.permission) {
+      return true;
+    }
+
     return canAccess(admin, item.permission);
   });
 }
