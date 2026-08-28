@@ -12,7 +12,11 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-50 border-b border-[#e6e1d6]/80 bg-[#f7f5ef]/92 backdrop-blur-xl">
       <div className="page-shell flex h-24 items-center justify-between">
-        <Link href="/" className="flex items-center">
+        <Link
+          href="/"
+          className="flex items-center"
+          onClick={() => setIsOpen(false)}
+        >
           <img
             src="/images/logo-chorale.png"
             alt="Chorale Rayon de Soleil Lyon 6"
@@ -33,7 +37,7 @@ export function Navbar() {
         </nav>
 
         <div className="hidden lg:block">
-          <Button href="/admin/login" variant="secondary">
+          <Button href="/connexion" variant="secondary">
             Accès membres
           </Button>
         </div>
@@ -42,7 +46,8 @@ export function Navbar() {
           type="button"
           className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#dcd6ca] bg-white text-[#1f1f1a] lg:hidden"
           onClick={() => setIsOpen((value) => !value)}
-          aria-label="Ouvrir le menu"
+          aria-label={isOpen ? "Fermer le menu" : "Ouvrir le menu"}
+          aria-expanded={isOpen}
         >
           {isOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
@@ -63,7 +68,7 @@ export function Navbar() {
             ))}
 
             <Button
-              href="/admin/login"
+              href="/connexion"
               variant="secondary"
               className="mt-3 w-full"
             >
