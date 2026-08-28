@@ -8,5 +8,15 @@
       "database_name": "chorale-db",
       "database_id": "878c4404-ba89-452c-b0ca-fd20eb60c6bf"
     }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "PUBLIC_STORAGE",
+      "bucket_name": "chorale-public"
+    },
+    {
+      "binding": "PRIVATE_STORAGE",
+      "bucket_name": "chorale-private"
+    }
   ]
 }

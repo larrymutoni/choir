@@ -1,5 +1,7 @@
 export interface Env {
   DB: D1Database;
+  PUBLIC_STORAGE: R2Bucket;
+  PRIVATE_STORAGE: R2Bucket;
   DB_PROXY_SECRET: string;
 }
 
