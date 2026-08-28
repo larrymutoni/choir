@@ -30,12 +30,20 @@ export default {
       const url = new URL(request.url);
 
       if (request.method === "GET" && url.pathname === "/health") {
-        const result = await env.DB.prepare("SELECT 1 AS ok").first<{
+        const dbResult = await env.DB.prepare("SELECT 1 AS ok").first<{
           ok: number;
         }>();
 
+        await env.PUBLIC_STORAGE.list({ limit: 1 });
+        await env.PRIVATE_STORAGE.list({ limit: 1 });
+
         return json({
-          ok: result?.ok === 1,
+          ok: dbResult?.ok === 1,
+          services: {
+            d1: dbResult?.ok === 1,
+            public_storage: true,
+            private_storage: true,
+          },
         });
       }
 
