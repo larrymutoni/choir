@@ -1,6 +1,7 @@
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import ProfileForm from "@/components/ProfileForm";
 import { requireUser } from "@/server/auth/guard";
 import { getMemberProfile } from "@/server/auth/service";
-import ProfileForm from "@/components/ProfileForm";
 
 export default async function ProfilePage() {
   const session = await requireUser();
@@ -11,10 +12,15 @@ export default async function ProfilePage() {
   }
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-10">
-      <h1 className="mb-8 text-3xl font-semibold">Mon profil</h1>
+    <main>
+      <DashboardHeader
+        title="Mon profil"
+        description="Gérez vos informations personnelles."
+      />
 
-      <ProfileForm profile={profile} />
+      <div className="max-w-3xl">
+        <ProfileForm profile={profile} />
+      </div>
     </main>
   );
 }
