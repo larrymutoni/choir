@@ -1,14 +1,13 @@
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { getDashboardNavigation } from "@/lib/dashboard-navigation";
-import { requireRole } from "@/server/auth/guard";
+import { requireUser } from "@/server/auth/guard";
 
-export default async function AdminLayout({
+export default async function MemberLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const user = await requireRole(["admin", "super_admin"]);
-
+  const user = await requireUser();
   const links = getDashboardNavigation(user.role);
 
   return (
