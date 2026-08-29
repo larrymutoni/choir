@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CheckCircle2, Mail, Phone, Save, UserRound } from "lucide-react";
 
 type Profile = {
   firstname: string;
@@ -16,12 +17,22 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
   const [firstname, setFirstname] = useState(profile.firstname);
   const [lastname, setLastname] = useState(profile.lastname);
   const [phone, setPhone] = useState(profile.phone ?? "");
+
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const hasChanges =
+    firstname.trim() !== profile.firstname ||
+    lastname.trim() !== profile.lastname ||
+    phone.trim() !== (profile.phone ?? "");
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!hasChanges || loading) {
+      return;
+    }
 
     setMessage("");
     setError("");
@@ -34,97 +45,197 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          firstname,
-          lastname,
-          phone: phone || null,
+          firstname: firstname.trim(),
+          lastname: lastname.trim(),
+          phone: phone.trim() || null,
         }),
       });
 
-      const result = (await response.json()) as {
-        message?: string;
-      };
-
       if (!response.ok) {
-        setError(result.message ?? "Modification impossible.");
+        setError("Impossible de modifier le profil.");
         return;
       }
+
+      setFirstname(firstname.trim());
+      setLastname(lastname.trim());
+      setPhone(phone.trim());
 
       setMessage("Profil mis à jour.");
       router.refresh();
     } catch {
-      setError("Modification impossible.");
+      setError("Impossible de modifier le profil.");
     } finally {
       setLoading(false);
     }
   }
 
+  const inputClassName =
+    "w-full rounded-xl border border-[#ded9ce] bg-white px-4 py-3 text-sm text-[#1f1f1a] outline-none transition placeholder:text-[#aaa69d] focus:border-[#9ba793] focus:ring-4 focus:ring-[#687a5e]/10 disabled:cursor-not-allowed disabled:bg-[#f4f2ed] disabled:text-[#8e8a82]";
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label htmlFor="firstname" className="mb-1 block font-medium">
-          Prénom
-        </label>
+    <form
+      onSubmit={handleSubmit}
+      className="overflow-hidden rounded-2xl border border-[#e6e1d6] bg-white"
+    >
+      <div className="border-b border-[#eeeae1] px-5 py-5 sm:px-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#eef1ea] text-[#687a5e]">
+            <UserRound size={19} />
+          </div>
 
-        <input
-          id="firstname"
-          required
-          value={firstname}
-          onChange={(event) => setFirstname(event.target.value)}
-          className="w-full rounded-md border px-3 py-2"
-        />
+          <div>
+            <h2 className="text-base font-black text-[#1f1f1a]">
+              Informations personnelles
+            </h2>
+
+            <p className="mt-0.5 text-sm text-[#817e75]">
+              Ces informations sont liées à votre compte.
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div>
-        <label htmlFor="lastname" className="mb-1 block font-medium">
-          Nom
-        </label>
+      <div className="p-5 sm:p-6">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div>
+            <label
+              htmlFor="firstname"
+              className="mb-2 block text-sm font-bold text-[#4f4d47]"
+            >
+              Prénom
+            </label>
 
-        <input
-          id="lastname"
-          required
-          value={lastname}
-          onChange={(event) => setLastname(event.target.value)}
-          className="w-full rounded-md border px-3 py-2"
-        />
+            <input
+              id="firstname"
+              name="firstname"
+              autoComplete="given-name"
+              required
+              minLength={2}
+              maxLength={80}
+              value={firstname}
+              onChange={(event) => {
+                setFirstname(event.target.value);
+                setMessage("");
+                setError("");
+              }}
+              className={inputClassName}
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="lastname"
+              className="mb-2 block text-sm font-bold text-[#4f4d47]"
+            >
+              Nom
+            </label>
+
+            <input
+              id="lastname"
+              name="lastname"
+              autoComplete="family-name"
+              required
+              minLength={2}
+              maxLength={80}
+              value={lastname}
+              onChange={(event) => {
+                setLastname(event.target.value);
+                setMessage("");
+                setError("");
+              }}
+              className={inputClassName}
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="email"
+              className="mb-2 block text-sm font-bold text-[#4f4d47]"
+            >
+              Email
+            </label>
+
+            <div className="relative">
+              <Mail
+                size={17}
+                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#98958d]"
+              />
+
+              <input
+                id="email"
+                type="email"
+                value={profile.email}
+                disabled
+                className={`${inputClassName} pl-11`}
+              />
+            </div>
+
+            <p className="mt-1.5 text-xs text-[#98958d]">
+              L’adresse email ne peut pas être modifiée ici.
+            </p>
+          </div>
+
+          <div>
+            <label
+              htmlFor="phone"
+              className="mb-2 block text-sm font-bold text-[#4f4d47]"
+            >
+              Téléphone
+              <span className="ml-1 font-normal text-[#98958d]">
+                (facultatif)
+              </span>
+            </label>
+
+            <div className="relative">
+              <Phone
+                size={17}
+                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#98958d]"
+              />
+
+              <input
+                id="phone"
+                name="phone"
+                type="tel"
+                autoComplete="tel"
+                maxLength={30}
+                value={phone}
+                onChange={(event) => {
+                  setPhone(event.target.value);
+                  setMessage("");
+                  setError("");
+                }}
+                placeholder="+33 6 00 00 00 00"
+                className={`${inputClassName} pl-11`}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 min-h-6" aria-live="polite">
+          {error && (
+            <p className="text-sm font-semibold text-red-600">{error}</p>
+          )}
+
+          {message && (
+            <p className="flex items-center gap-2 text-sm font-semibold text-[#687a5e]">
+              <CheckCircle2 size={16} />
+              {message}
+            </p>
+          )}
+        </div>
       </div>
 
-      <div>
-        <label htmlFor="email" className="mb-1 block font-medium">
-          Email
-        </label>
+      <div className="flex justify-end border-t border-[#eeeae1] bg-[#faf9f6] px-5 py-4 sm:px-6">
+        <button
+          type="submit"
+          disabled={loading || !hasChanges}
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#687a5e] px-5 text-sm font-bold text-white transition hover:bg-[#56664d] disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          <Save size={16} />
 
-        <input
-          id="email"
-          value={profile.email}
-          disabled
-          className="w-full rounded-md border px-3 py-2 opacity-60"
-        />
+          {loading ? "Enregistrement..." : "Enregistrer"}
+        </button>
       </div>
-
-      <div>
-        <label htmlFor="phone" className="mb-1 block font-medium">
-          Téléphone
-        </label>
-
-        <input
-          id="phone"
-          type="tel"
-          value={phone}
-          onChange={(event) => setPhone(event.target.value)}
-          className="w-full rounded-md border px-3 py-2"
-        />
-      </div>
-
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {message && <p className="text-sm">{message}</p>}
-
-      <button
-        type="submit"
-        disabled={loading}
-        className="rounded-md bg-black px-4 py-2 text-white disabled:opacity-50"
-      >
-        {loading ? "Enregistrement..." : "Enregistrer"}
-      </button>
     </form>
   );
 }
