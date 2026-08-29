@@ -16,7 +16,7 @@ export async function requireRole(allowedRoles: UserRole[]) {
   const session = await requireUser();
 
   if (!allowedRoles.includes(session.role)) {
-    redirect("/");
+    redirect("/membre");
   }
 
   return session;
