@@ -1,4 +1,5 @@
 import { Env, isAuthorized, json } from "./http";
+
 import {
   checkAuthorizedEmail,
   createUser,
@@ -8,17 +9,33 @@ import {
   updateUserRole,
   updateUserStatus,
 } from "./users";
+
 import {
   addAuthorizedEmail,
   deleteAuthorizedEmail,
   listAuthorizedEmails,
 } from "./emails";
+
 import { createSession, deleteSession, findSession } from "./sessions";
+
 import {
   consumePasswordResetToken,
   createPasswordResetToken,
   findPasswordResetToken,
 } from "./password-resets";
+
+import {
+  createCalendarEvent,
+  deleteCalendarEvent,
+  getCalendarEvent,
+  listCalendarEvents,
+  splitCalendarSeries,
+  truncateCalendarSeries,
+  updateCalendarEvent,
+  upsertCalendarException,
+} from "./calendar";
+
+import { createImportedCalendarEvents } from "./calendar-import";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -34,8 +51,13 @@ export default {
           ok: number;
         }>();
 
-        await env.PUBLIC_STORAGE.list({ limit: 1 });
-        await env.PRIVATE_STORAGE.list({ limit: 1 });
+        await env.PUBLIC_STORAGE.list({
+          limit: 1,
+        });
+
+        await env.PRIVATE_STORAGE.list({
+          limit: 1,
+        });
 
         return json({
           ok: dbResult?.ok === 1,
@@ -45,6 +67,63 @@ export default {
             private_storage: true,
           },
         });
+      }
+
+      if (request.method === "GET" && url.pathname === "/v1/calendar-events") {
+        return listCalendarEvents(request, env);
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname === "/v1/calendar-events/by-id"
+      ) {
+        return getCalendarEvent(request, env);
+      }
+
+      if (request.method === "POST" && url.pathname === "/v1/calendar-events") {
+        return createCalendarEvent(request, env);
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname === "/v1/calendar-events/import"
+      ) {
+        return createImportedCalendarEvents(request, env);
+      }
+
+      if (
+        request.method === "PATCH" &&
+        url.pathname === "/v1/calendar-events"
+      ) {
+        return updateCalendarEvent(request, env);
+      }
+
+      if (
+        request.method === "DELETE" &&
+        url.pathname === "/v1/calendar-events"
+      ) {
+        return deleteCalendarEvent(request, env);
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname === "/v1/calendar-exceptions"
+      ) {
+        return upsertCalendarException(request, env);
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname === "/v1/calendar-events/truncate"
+      ) {
+        return truncateCalendarSeries(request, env);
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname === "/v1/calendar-events/split"
+      ) {
+        return splitCalendarSeries(request, env);
       }
 
       if (
@@ -127,7 +206,12 @@ export default {
     } catch (error) {
       console.error(error);
 
-      return json({ error: "Internal server error" }, 500);
+      return json(
+        {
+          error: "Internal server error",
+        },
+        500,
+      );
     }
   },
 };
