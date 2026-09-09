@@ -1,10 +1,20 @@
-import { ComingSoon } from "@/components/dashboard/ComingSoon";
+import { CalendarClient } from "@/components/calendar/CalendarClient";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { requireUser } from "@/server/auth/guard";
 
-export default function CalendarPage() {
+export default async function CalendarPage() {
+  const user = await requireUser();
+
+  const canManage = user.role === "admin" || user.role === "super_admin";
+
   return (
-    <ComingSoon
-      title="Calendrier"
-      description="Retrouvez ici le calendrier de la chorale."
-    />
+    <main>
+      <DashboardHeader
+        title="Calendrier"
+        description="Retrouvez les dates et rendez-vous de la chorale."
+      />
+
+      <CalendarClient canManage={canManage} />
+    </main>
   );
 }

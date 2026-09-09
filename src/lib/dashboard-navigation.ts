@@ -39,7 +39,6 @@ export const dashboardNavigationItems: DashboardNavigationItem[] = [
     href: "/membre/calendrier",
     iconKey: "calendar",
     roles: ALL_ROLES,
-    comingSoon: true,
   },
   {
     label: "Répertoire",
