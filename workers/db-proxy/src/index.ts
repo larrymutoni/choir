@@ -37,10 +37,25 @@ import {
 
 import { createImportedCalendarEvents } from "./calendar-import";
 
+import {
+  approveMemberUser,
+  createMember,
+  deleteMember,
+  importMembers,
+  listMembers,
+  rejectMemberUser,
+  updateMember,
+} from "./members";
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (!isAuthorized(request, env)) {
-      return json({ error: "Unauthorized" }, 401);
+      return json(
+        {
+          error: "Unauthorized",
+        },
+        401,
+      );
     }
 
     try {
@@ -61,13 +76,58 @@ export default {
 
         return json({
           ok: dbResult?.ok === 1,
+
           services: {
             d1: dbResult?.ok === 1,
+
             public_storage: true,
+
             private_storage: true,
           },
         });
       }
+
+      /*
+       * MEMBERS
+       */
+
+      if (request.method === "GET" && url.pathname === "/v1/members") {
+        return listMembers(request, env);
+      }
+
+      if (request.method === "POST" && url.pathname === "/v1/members") {
+        return createMember(request, env);
+      }
+
+      if (request.method === "PATCH" && url.pathname === "/v1/members") {
+        return updateMember(request, env);
+      }
+
+      if (request.method === "DELETE" && url.pathname === "/v1/members") {
+        return deleteMember(request, env);
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname === "/v1/members/approve-user"
+      ) {
+        return approveMemberUser(request, env);
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname === "/v1/members/reject-user"
+      ) {
+        return rejectMemberUser(request, env);
+      }
+
+      if (request.method === "POST" && url.pathname === "/v1/members/import") {
+        return importMembers(request, env);
+      }
+
+      /*
+       * CALENDAR
+       */
 
       if (request.method === "GET" && url.pathname === "/v1/calendar-events") {
         return listCalendarEvents(request, env);
@@ -126,6 +186,10 @@ export default {
         return splitCalendarSeries(request, env);
       }
 
+      /*
+       * EMAILS
+       */
+
       if (
         request.method === "POST" &&
         url.pathname === "/v1/emails/authorized"
@@ -144,6 +208,10 @@ export default {
       if (request.method === "DELETE" && url.pathname === "/v1/emails") {
         return deleteAuthorizedEmail(request, env);
       }
+
+      /*
+       * USERS
+       */
 
       if (request.method === "POST" && url.pathname === "/v1/users/by-email") {
         return findUserByEmail(request, env);
@@ -169,6 +237,10 @@ export default {
         return updateUserProfile(request, env);
       }
 
+      /*
+       * SESSIONS
+       */
+
       if (request.method === "POST" && url.pathname === "/v1/sessions") {
         return createSession(request, env);
       }
@@ -183,6 +255,10 @@ export default {
       if (request.method === "DELETE" && url.pathname === "/v1/sessions") {
         return deleteSession(request, env);
       }
+
+      /*
+       * PASSWORD RESET
+       */
 
       if (request.method === "POST" && url.pathname === "/v1/password-resets") {
         return createPasswordResetToken(request, env);
@@ -202,7 +278,12 @@ export default {
         return consumePasswordResetToken(request, env);
       }
 
-      return json({ error: "Not found" }, 404);
+      return json(
+        {
+          error: "Not found",
+        },
+        404,
+      );
     } catch (error) {
       console.error(error);
 

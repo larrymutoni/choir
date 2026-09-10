@@ -6,16 +6,16 @@ type AuthorizedEmailRow = {
   created_at: string;
 };
 
-export async function listAuthorizedEmails(
-  _request: Request,
-  env: Env,
-) {
+export async function listAuthorizedEmails(_request: Request, env: Env) {
   const result = await env.DB.prepare(
     `
-    SELECT id, email, created_at
-    FROM emails
-    ORDER BY created_at DESC
-    `,
+      SELECT
+        id,
+        email,
+        created_at
+      FROM emails
+      ORDER BY created_at DESC
+      `,
   ).all<AuthorizedEmailRow>();
 
   return json({
@@ -23,57 +23,174 @@ export async function listAuthorizedEmails(
   });
 }
 
-export async function addAuthorizedEmail(
-  request: Request,
-  env: Env,
-) {
-  const body = await readJson<{ email?: string }>(request);
+export async function addAuthorizedEmail(request: Request, env: Env) {
+  const body = await readJson<{
+    email?: string;
+  }>(request);
 
   if (!body.email) {
-    return json({ error: "Email is required" }, 400);
+    return json(
+      {
+        error: "Email is required",
+      },
+      400,
+    );
   }
 
   const email = normalizeEmail(body.email);
 
-  await env.DB.prepare(
-    `
-    INSERT OR IGNORE INTO emails (
-      id,
-      email,
-      created_at
-    )
-    VALUES (?, ?, ?)
-    `,
-  )
-    .bind(
-      crypto.randomUUID(),
-      email,
-      new Date().toISOString(),
-    )
-    .run();
+  const now = new Date().toISOString();
 
-  return json({ ok: true }, 201);
+  await env.DB.batch([
+    env.DB.prepare(
+      `
+      INSERT OR IGNORE INTO emails (
+        id,
+        email,
+        created_at
+      )
+      VALUES (?, ?, ?)
+      `,
+    ).bind(crypto.randomUUID(), email, now),
+
+    /*
+     * Compatibility with the old
+     * "Emails autorisés" screen.
+     *
+     * An authorized email now also becomes
+     * an official member record.
+     */
+    env.DB.prepare(
+      `
+      INSERT OR IGNORE INTO members (
+        id,
+        firstname,
+        lastname,
+        email,
+        phone,
+        created_at,
+        updated_at
+      )
+      VALUES (?, NULL, NULL, ?, NULL, ?, ?)
+      `,
+    ).bind(crypto.randomUUID(), email, now, now),
+
+    env.DB.prepare(
+      `
+      UPDATE users
+      SET
+        status = 'active',
+        updated_at = ?
+      WHERE LOWER(email) =
+            LOWER(?)
+        AND role_id = (
+          SELECT id
+          FROM roles
+          WHERE name = 'member'
+          LIMIT 1
+        )
+      `,
+    ).bind(now, email),
+  ]);
+
+  return json(
+    {
+      ok: true,
+    },
+    201,
+  );
 }
 
-export async function deleteAuthorizedEmail(
-  request: Request,
-  env: Env,
-) {
-  const body = await readJson<{ id?: string }>(request);
+export async function deleteAuthorizedEmail(request: Request, env: Env) {
+  const body = await readJson<{
+    id?: string;
+  }>(request);
 
   if (!body.id) {
-    return json({ error: "Email ID is required" }, 400);
+    return json(
+      {
+        error: "Email ID is required",
+      },
+      400,
+    );
   }
 
-  const result = await env.DB.prepare(
-    "DELETE FROM emails WHERE id = ?",
+  const existing = await env.DB.prepare(
+    `
+      SELECT
+        id,
+        email
+      FROM emails
+      WHERE id = ?
+      LIMIT 1
+      `,
   )
     .bind(body.id)
-    .run();
+    .first<AuthorizedEmailRow>();
 
-  if (result.meta.changes === 0) {
-    return json({ error: "Email not found" }, 404);
+  if (!existing) {
+    return json(
+      {
+        error: "Email not found",
+      },
+      404,
+    );
   }
 
-  return json({ ok: true });
+  const now = new Date().toISOString();
+
+  await env.DB.batch([
+    env.DB.prepare(
+      `
+      DELETE FROM sessions
+      WHERE user_id IN (
+        SELECT users.id
+        FROM users
+        JOIN roles
+          ON roles.id =
+             users.role_id
+        WHERE LOWER(users.email) =
+              LOWER(?)
+          AND roles.name =
+              'member'
+      )
+      `,
+    ).bind(existing.email),
+
+    env.DB.prepare(
+      `
+      UPDATE users
+      SET
+        status = 'rejected',
+        updated_at = ?
+      WHERE LOWER(email) =
+            LOWER(?)
+        AND role_id = (
+          SELECT id
+          FROM roles
+          WHERE name = 'member'
+          LIMIT 1
+        )
+      `,
+    ).bind(now, existing.email),
+
+    env.DB.prepare(
+      `
+      DELETE FROM members
+      WHERE LOWER(email) =
+            LOWER(?)
+      `,
+    ).bind(existing.email),
+
+    env.DB.prepare(
+      `
+      DELETE FROM emails
+      WHERE id = ?
+      `,
+    ).bind(body.id),
+  ]);
+
+  return json({
+    ok: true,
+  });
 }

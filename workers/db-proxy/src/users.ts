@@ -16,16 +16,37 @@ type UserRow = {
 };
 
 export async function checkAuthorizedEmail(request: Request, env: Env) {
-  const body = await readJson<{ email?: string }>(request);
+  const body = await readJson<{
+    email?: string;
+  }>(request);
 
   if (!body.email) {
-    return json({ error: "Email is required" }, 400);
+    return json(
+      {
+        error: "Email is required",
+      },
+      400,
+    );
   }
 
   const email = normalizeEmail(body.email);
 
+  /*
+   * IMPORTANT:
+   * Membership is now the source of truth.
+   *
+   * Being present in the official member
+   * list is what authorizes automatic
+   * registration.
+   */
   const row = await env.DB.prepare(
-    "SELECT id FROM emails WHERE email = ? LIMIT 1",
+    `
+      SELECT id
+      FROM members
+      WHERE LOWER(email) =
+            LOWER(?)
+      LIMIT 1
+      `,
   )
     .bind(email)
     .first();
@@ -36,39 +57,50 @@ export async function checkAuthorizedEmail(request: Request, env: Env) {
 }
 
 export async function findUserByEmail(request: Request, env: Env) {
-  const body = await readJson<{ email?: string }>(request);
+  const body = await readJson<{
+    email?: string;
+  }>(request);
 
   if (!body.email) {
-    return json({ error: "Email is required" }, 400);
+    return json(
+      {
+        error: "Email is required",
+      },
+      400,
+    );
   }
 
   const email = normalizeEmail(body.email);
 
   const user = await env.DB.prepare(
     `
-    SELECT
-      users.id,
-      users.role_id,
-      roles.name AS role_name,
-      users.firstname,
-      users.lastname,
-      users.email,
-      users.password_hash,
-      users.phone,
-      users.avatar_key,
-      users.status,
-      users.created_at,
-      users.updated_at
-    FROM users
-    JOIN roles ON roles.id = users.role_id
-    WHERE users.email = ?
-    LIMIT 1
-    `,
+      SELECT
+        users.id,
+        users.role_id,
+        roles.name AS role_name,
+        users.firstname,
+        users.lastname,
+        users.email,
+        users.password_hash,
+        users.phone,
+        users.avatar_key,
+        users.status,
+        users.created_at,
+        users.updated_at
+      FROM users
+      JOIN roles
+        ON roles.id =
+           users.role_id
+      WHERE users.email = ?
+      LIMIT 1
+      `,
   )
     .bind(email)
     .first<UserRow>();
 
-  return json({ user: user ?? null });
+  return json({
+    user: user ?? null,
+  });
 }
 
 export async function createUser(request: Request, env: Env) {
@@ -90,27 +122,51 @@ export async function createUser(request: Request, env: Env) {
     !body.email ||
     !body.passwordHash
   ) {
-    return json({ error: "Missing required user data" }, 400);
+    return json(
+      {
+        error: "Missing required user data",
+      },
+      400,
+    );
   }
 
   const roleName = body.role ?? "member";
+
   const status = body.status ?? "pending";
 
   if (!["pending", "active", "rejected"].includes(status)) {
-    return json({ error: "Invalid user status" }, 400);
+    return json(
+      {
+        error: "Invalid user status",
+      },
+      400,
+    );
   }
 
   const role = await env.DB.prepare(
-    "SELECT id FROM roles WHERE name = ? LIMIT 1",
+    `
+      SELECT id
+      FROM roles
+      WHERE name = ?
+      LIMIT 1
+      `,
   )
     .bind(roleName)
-    .first<{ id: number }>();
+    .first<{
+      id: number;
+    }>();
 
   if (!role) {
-    return json({ error: "Invalid role" }, 400);
+    return json(
+      {
+        error: "Invalid role",
+      },
+      400,
+    );
   }
 
   const email = normalizeEmail(body.email);
+
   const now = new Date().toISOString();
 
   try {
@@ -128,7 +184,9 @@ export async function createUser(request: Request, env: Env) {
         created_at,
         updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      )
       `,
     )
       .bind(
@@ -148,32 +206,45 @@ export async function createUser(request: Request, env: Env) {
     const message = error instanceof Error ? error.message : String(error);
 
     if (message.includes("UNIQUE")) {
-      return json({ error: "User already exists" }, 409);
+      return json(
+        {
+          error: "User already exists",
+        },
+        409,
+      );
     }
 
     throw error;
   }
 
-  return json({ ok: true }, 201);
+  return json(
+    {
+      ok: true,
+    },
+    201,
+  );
 }
 
 export async function listUsers(_request: Request, env: Env) {
   const result = await env.DB.prepare(
     `
-    SELECT
-      users.id,
-      roles.name AS role,
-      users.firstname,
-      users.lastname,
-      users.email,
-      users.phone,
-      users.status,
-      users.created_at,
-      users.updated_at
-    FROM users
-    JOIN roles ON roles.id = users.role_id
-    ORDER BY users.created_at DESC
-    `,
+      SELECT
+        users.id,
+        roles.name AS role,
+        users.firstname,
+        users.lastname,
+        users.email,
+        users.phone,
+        users.status,
+        users.created_at,
+        users.updated_at
+      FROM users
+      JOIN roles
+        ON roles.id =
+           users.role_id
+      ORDER BY
+        users.created_at DESC
+      `,
   ).all();
 
   return json({
@@ -188,29 +259,49 @@ export async function updateUserStatus(request: Request, env: Env) {
   }>(request);
 
   if (!body.userId || !body.status) {
-    return json({ error: "User ID and status are required" }, 400);
+    return json(
+      {
+        error: "User ID and status are required",
+      },
+      400,
+    );
   }
 
   if (!["pending", "active", "rejected"].includes(body.status)) {
-    return json({ error: "Invalid user status" }, 400);
+    return json(
+      {
+        error: "Invalid user status",
+      },
+      400,
+    );
   }
 
   const result = await env.DB.prepare(
     `
-    UPDATE users
-    SET status = ?, updated_at = ?
-    WHERE id = ?
-    `,
+      UPDATE users
+      SET
+        status = ?,
+        updated_at = ?
+      WHERE id = ?
+      `,
   )
     .bind(body.status, new Date().toISOString(), body.userId)
     .run();
 
   if (result.meta.changes === 0) {
-    return json({ error: "User not found" }, 404);
+    return json(
+      {
+        error: "User not found",
+      },
+      404,
+    );
   }
 
-  return json({ ok: true });
+  return json({
+    ok: true,
+  });
 }
+
 export async function updateUserRole(request: Request, env: Env) {
   const body = await readJson<{
     userId?: string;
@@ -218,35 +309,62 @@ export async function updateUserRole(request: Request, env: Env) {
   }>(request);
 
   if (!body.userId || !body.role) {
-    return json({ error: "User ID and role are required" }, 400);
+    return json(
+      {
+        error: "User ID and role are required",
+      },
+      400,
+    );
   }
 
   const role = await env.DB.prepare(
-    "SELECT id FROM roles WHERE name = ? LIMIT 1",
+    `
+      SELECT id
+      FROM roles
+      WHERE name = ?
+      LIMIT 1
+      `,
   )
     .bind(body.role)
-    .first<{ id: number }>();
+    .first<{
+      id: number;
+    }>();
 
   if (!role) {
-    return json({ error: "Invalid role" }, 400);
+    return json(
+      {
+        error: "Invalid role",
+      },
+      400,
+    );
   }
 
   const result = await env.DB.prepare(
     `
-    UPDATE users
-    SET role_id = ?, updated_at = ?
-    WHERE id = ?
-    `,
+      UPDATE users
+      SET
+        role_id = ?,
+        updated_at = ?
+      WHERE id = ?
+      `,
   )
     .bind(role.id, new Date().toISOString(), body.userId)
     .run();
 
   if (result.meta.changes === 0) {
-    return json({ error: "User not found" }, 404);
+    return json(
+      {
+        error: "User not found",
+      },
+      404,
+    );
   }
 
-  return json({ ok: true });
+  return json({
+    ok: true,
+  });
 }
+
 export async function updateUserProfile(request: Request, env: Env) {
   const body = await readJson<{
     userId?: string;
@@ -256,32 +374,76 @@ export async function updateUserProfile(request: Request, env: Env) {
   }>(request);
 
   if (!body.userId || !body.firstname?.trim() || !body.lastname?.trim()) {
-    return json({ error: "Missing profile data" }, 400);
+    return json(
+      {
+        error: "Missing profile data",
+      },
+      400,
+    );
   }
 
-  const result = await env.DB.prepare(
-    `
-    UPDATE users
-    SET
-      firstname = ?,
-      lastname = ?,
-      phone = ?,
-      updated_at = ?
-    WHERE id = ?
-    `,
-  )
-    .bind(
+  const now = new Date().toISOString();
+
+  const results = await env.DB.batch([
+    env.DB.prepare(
+      `
+        UPDATE users
+        SET
+          firstname = ?,
+          lastname = ?,
+          phone = ?,
+          updated_at = ?
+        WHERE id = ?
+        `,
+    ).bind(
       body.firstname.trim(),
       body.lastname.trim(),
       body.phone?.trim() || null,
-      new Date().toISOString(),
+      now,
       body.userId,
-    )
-    .run();
+    ),
 
-  if (result.meta.changes === 0) {
-    return json({ error: "User not found" }, 404);
+    /*
+     * If this account belongs to an official
+     * member, keep the pre-registration
+     * member record synchronized too.
+     */
+    env.DB.prepare(
+      `
+        UPDATE members
+        SET
+          firstname = ?,
+          lastname = ?,
+          phone = ?,
+          updated_at = ?
+        WHERE LOWER(email) = LOWER(
+          (
+            SELECT email
+            FROM users
+            WHERE id = ?
+            LIMIT 1
+          )
+        )
+        `,
+    ).bind(
+      body.firstname.trim(),
+      body.lastname.trim(),
+      body.phone?.trim() || null,
+      now,
+      body.userId,
+    ),
+  ]);
+
+  if (results[0].meta.changes === 0) {
+    return json(
+      {
+        error: "User not found",
+      },
+      404,
+    );
   }
 
-  return json({ ok: true });
+  return json({
+    ok: true,
+  });
 }

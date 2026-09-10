@@ -1,10 +1,8 @@
-import { ComingSoon } from "@/components/dashboard/ComingSoon";
+import { MemberDirectory } from "@/components/directory/MemberDirectory";
+import { requireUser } from "@/server/auth/guard";
 
-export default function RepertoirePage() {
-  return (
-    <ComingSoon
-      title="Répertoire"
-      description="Le répertoire de la chorale sera disponible ici."
-    />
-  );
+export default async function MemberDirectoryPage() {
+  await requireUser();
+
+  return <MemberDirectory />;
 }
