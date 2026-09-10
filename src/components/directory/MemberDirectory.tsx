@@ -1,0 +1,2156 @@
+"use client";
+
+import {
+  Check,
+  Clock3,
+  FileUp,
+  Mail,
+  MoreHorizontal,
+  Pencil,
+  Phone,
+  Plus,
+  Search,
+  ShieldCheck,
+  Trash2,
+  UserCheck,
+  UserRound,
+  UsersRound,
+  UserX,
+  X,
+} from "lucide-react";
+
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from "react";
+
+import {
+  MemberImportDialog,
+} from "@/components/directory/MemberImportDialog";
+
+type Role =
+  | "member"
+  | "admin"
+  | "super_admin";
+
+type AccountStatus =
+  | "pending"
+  | "active"
+  | "rejected"
+  | null;
+
+type MemberEntry = {
+  membershipId: string | null;
+  userId: string | null;
+
+  firstname: string;
+  lastname: string;
+
+  email: string;
+  phone: string | null;
+
+  role: Role;
+  accountStatus: AccountStatus;
+
+  isOfficial: boolean;
+};
+
+type StatusFilter =
+  | "all"
+  | "active"
+  | "not_registered"
+  | "pending"
+  | "rejected";
+
+type RoleFilter =
+  | "all"
+  | Role;
+
+type MemberForm = {
+  firstname: string;
+  lastname: string;
+  email: string;
+  phone: string;
+};
+
+const emptyForm: MemberForm = {
+  firstname: "",
+  lastname: "",
+  email: "",
+  phone: "",
+};
+
+const PAGE_SIZE = 10;
+
+function normalizeEmail(
+  value: string,
+) {
+  return value
+    .trim()
+    .toLowerCase();
+}
+
+function initials(
+  member: MemberEntry,
+) {
+  const first =
+    member.firstname
+      .trim()
+      .charAt(0);
+
+  const last =
+    member.lastname
+      .trim()
+      .charAt(0);
+
+  if (first || last) {
+    return `${first}${last}`.toUpperCase();
+  }
+
+  return member.email
+    .charAt(0)
+    .toUpperCase();
+}
+
+function fullName(
+  member: MemberEntry,
+) {
+  const value =
+    `${member.firstname} ${member.lastname}`.trim();
+
+  return value || member.email;
+}
+
+function roleLabel(
+  role: Role,
+) {
+  if (
+    role === "super_admin"
+  ) {
+    return "Super administrateur";
+  }
+
+  if (role === "admin") {
+    return "Administrateur";
+  }
+
+  return "Membre";
+}
+
+function statusOf(
+  member: MemberEntry,
+): Exclude<
+  StatusFilter,
+  "all"
+> {
+  /*
+   * Important:
+   * an already-active account is active.
+   * It must never appear as a new pending
+   * registration simply because it predates
+   * the members table.
+   */
+  if (
+    member.accountStatus ===
+    "active"
+  ) {
+    return "active";
+  }
+
+  if (
+    member.accountStatus ===
+    "rejected"
+  ) {
+    return "rejected";
+  }
+
+  if (
+    member.isOfficial &&
+    !member.userId
+  ) {
+    return "not_registered";
+  }
+
+  return "pending";
+}
+
+function statusLabel(
+  status: Exclude<
+    StatusFilter,
+    "all"
+  >,
+) {
+  if (
+    status === "active"
+  ) {
+    return "Actif";
+  }
+
+  if (
+    status ===
+    "not_registered"
+  ) {
+    return "Pas encore inscrit";
+  }
+
+  if (
+    status === "pending"
+  ) {
+    return "À valider";
+  }
+
+  return "Refusé";
+}
+
+function statusClasses(
+  status: Exclude<
+    StatusFilter,
+    "all"
+  >,
+) {
+  if (
+    status === "active"
+  ) {
+    return "bg-[#eaf2e6] text-[#4e6545]";
+  }
+
+  if (
+    status ===
+    "not_registered"
+  ) {
+    return "bg-[#efede7] text-[#706c63]";
+  }
+
+  if (
+    status === "pending"
+  ) {
+    return "bg-[#fff3d8] text-[#a25c0a]";
+  }
+
+  return "bg-red-50 text-red-700";
+}
+
+async function responseError(
+  response: Response,
+) {
+  try {
+    const data =
+      (await response.json()) as {
+        message?: string;
+      };
+
+    return (
+      data.message ||
+      "Une erreur est survenue."
+    );
+  } catch {
+    return "Une erreur est survenue.";
+  }
+}
+
+export function MemberDirectory() {
+  const [
+    members,
+    setMembers,
+  ] =
+    useState<MemberEntry[]>(
+      [],
+    );
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [
+    error,
+    setError,
+  ] = useState("");
+
+  const [
+    canManage,
+    setCanManage,
+  ] = useState(false);
+
+  const [
+    canManageRoles,
+    setCanManageRoles,
+  ] = useState(false);
+
+  const [
+    currentUserId,
+    setCurrentUserId,
+  ] = useState("");
+
+  const [
+    search,
+    setSearch,
+  ] = useState("");
+
+  const [
+    currentPage,
+    setCurrentPage,
+  ] = useState(1);
+
+  const [
+    statusFilter,
+    setStatusFilter,
+  ] =
+    useState<StatusFilter>(
+      "all",
+    );
+
+  const [
+    roleFilter,
+    setRoleFilter,
+  ] =
+    useState<RoleFilter>(
+      "all",
+    );
+
+  const [
+    selected,
+    setSelected,
+  ] =
+    useState<MemberEntry | null>(
+      null,
+    );
+
+  const [
+    menuMemberId,
+    setMenuMemberId,
+  ] =
+    useState<string | null>(
+      null,
+    );
+
+  const [
+    importOpen,
+    setImportOpen,
+  ] = useState(false);
+
+  const [
+    formOpen,
+    setFormOpen,
+  ] = useState(false);
+
+  const [
+    editingMember,
+    setEditingMember,
+  ] =
+    useState<MemberEntry | null>(
+      null,
+    );
+
+  const [
+    form,
+    setForm,
+  ] =
+    useState<MemberForm>(
+      emptyForm,
+    );
+
+  const [
+    saving,
+    setSaving,
+  ] = useState(false);
+
+  const [
+    formError,
+    setFormError,
+  ] = useState("");
+
+  const [
+    accountAction,
+    setAccountAction,
+  ] =
+    useState<string | null>(
+      null,
+    );
+
+  async function loadMembers() {
+    setLoading(true);
+    setError("");
+
+    try {
+      const response =
+        await fetch(
+          "/api/member/members",
+          {
+            cache: "no-store",
+          },
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          await responseError(
+            response,
+          ),
+        );
+      }
+
+      const data =
+        (await response.json()) as {
+          members:
+            MemberEntry[];
+
+          canManage:
+            boolean;
+
+          canManageRoles:
+            boolean;
+
+          currentUserId:
+            string;
+        };
+
+      setMembers(
+        data.members,
+      );
+
+      setCanManage(
+        data.canManage,
+      );
+
+      setCanManageRoles(
+        data.canManageRoles,
+      );
+
+      setCurrentUserId(
+        data.currentUserId,
+      );
+
+      setSelected(
+        (current) => {
+          if (!current) {
+            return null;
+          }
+
+          return (
+            data.members.find(
+              (member) =>
+                (
+                  current.membershipId &&
+                  member.membershipId ===
+                    current.membershipId
+                ) ||
+                (
+                  current.userId &&
+                  member.userId ===
+                    current.userId
+                ) ||
+                normalizeEmail(
+                  member.email,
+                ) ===
+                  normalizeEmail(
+                    current.email,
+                  ),
+            ) ?? null
+          );
+        },
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Impossible de charger les membres.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadMembers();
+  }, []);
+
+  const counts =
+    useMemo(() => {
+      const result = {
+        active: 0,
+        not_registered: 0,
+        pending: 0,
+        rejected: 0,
+      };
+
+      for (
+        const member of
+        members
+      ) {
+        result[
+          statusOf(member)
+        ] += 1;
+      }
+
+      return result;
+    }, [members]);
+
+  const filteredMembers =
+    useMemo(() => {
+      const query =
+        search
+          .trim()
+          .toLocaleLowerCase(
+            "fr",
+          );
+
+      return members.filter(
+        (member) => {
+          if (
+            statusFilter !==
+              "all" &&
+            statusOf(member) !==
+              statusFilter
+          ) {
+            return false;
+          }
+
+          if (
+            roleFilter !==
+              "all" &&
+            member.role !==
+              roleFilter
+          ) {
+            return false;
+          }
+
+          if (!query) {
+            return true;
+          }
+
+          const searchable =
+            [
+              member.firstname,
+              member.lastname,
+              member.email,
+              member.phone ?? "",
+              roleLabel(
+                member.role,
+              ),
+            ]
+              .join(" ")
+              .toLocaleLowerCase(
+                "fr",
+              );
+
+          return searchable.includes(
+            query,
+          );
+        },
+      );
+    }, [
+      members,
+      search,
+      statusFilter,
+      roleFilter,
+    ]);
+
+  const totalPages =
+    Math.max(
+      1,
+      Math.ceil(
+        filteredMembers.length /
+          PAGE_SIZE,
+      ),
+    );
+
+  const paginatedMembers =
+    filteredMembers.slice(
+      (currentPage - 1) *
+        PAGE_SIZE,
+      currentPage *
+        PAGE_SIZE,
+    );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    search,
+    statusFilter,
+    roleFilter,
+  ]);
+
+  useEffect(() => {
+    if (
+      currentPage >
+      totalPages
+    ) {
+      setCurrentPage(
+        totalPages,
+      );
+    }
+  }, [
+    currentPage,
+    totalPages,
+  ]);
+
+  function canEditTarget(
+    member: MemberEntry,
+  ) {
+    if (
+      !canManage ||
+      !member.membershipId
+    ) {
+      return false;
+    }
+
+    if (canManageRoles) {
+      return true;
+    }
+
+    return (
+      member.role ===
+      "member"
+    );
+  }
+
+  function canRemoveTarget(
+    member: MemberEntry,
+  ) {
+    if (
+      !canEditTarget(
+        member,
+      )
+    ) {
+      return false;
+    }
+
+    return (
+      member.userId !==
+      currentUserId
+    );
+  }
+
+  function openCreate() {
+    setEditingMember(null);
+    setForm(emptyForm);
+    setFormError("");
+    setFormOpen(true);
+  }
+
+  function openEdit(
+    member: MemberEntry,
+  ) {
+    if (
+      !member.membershipId
+    ) {
+      return;
+    }
+
+    setEditingMember(
+      member,
+    );
+
+    setForm({
+      firstname:
+        member.firstname,
+
+      lastname:
+        member.lastname,
+
+      email:
+        member.email,
+
+      phone:
+        member.phone ?? "",
+    });
+
+    setMenuMemberId(null);
+    setFormError("");
+    setFormOpen(true);
+  }
+
+  async function saveMember(
+    event: FormEvent,
+  ) {
+    event.preventDefault();
+
+    if (saving) {
+      return;
+    }
+
+    if (
+      !form.firstname.trim() ||
+      !form.lastname.trim() ||
+      !form.email.trim()
+    ) {
+      setFormError(
+        "Prénom, nom et email sont obligatoires.",
+      );
+
+      return;
+    }
+
+    setSaving(true);
+    setFormError("");
+
+    try {
+      const editing =
+        Boolean(
+          editingMember
+            ?.membershipId,
+        );
+
+      const response =
+        await fetch(
+          "/api/member/members",
+          {
+            method:
+              editing
+                ? "PATCH"
+                : "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                ...(editing
+                  ? {
+                      id:
+                        editingMember
+                          ?.membershipId,
+                    }
+                  : {}),
+
+                firstname:
+                  form.firstname.trim(),
+
+                lastname:
+                  form.lastname.trim(),
+
+                email:
+                  normalizeEmail(
+                    form.email,
+                  ),
+
+                phone:
+                  form.phone.trim() ||
+                  null,
+              }),
+          },
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          await responseError(
+            response,
+          ),
+        );
+      }
+
+      setFormOpen(false);
+      setEditingMember(null);
+      setForm(emptyForm);
+
+      await loadMembers();
+    } catch (cause) {
+      setFormError(
+        cause instanceof Error
+          ? cause.message
+          : "Impossible d'enregistrer ce membre.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function runUserAction(
+    member: MemberEntry,
+    action:
+      | "approve"
+      | "reject",
+  ) {
+    if (!member.userId) {
+      return;
+    }
+
+    if (
+      action === "reject" &&
+      !window.confirm(
+        `Refuser l'inscription de ${fullName(member)} ?`,
+      )
+    ) {
+      return;
+    }
+
+    setAccountAction(
+      `${action}:${member.userId}`,
+    );
+
+    setMenuMemberId(null);
+
+    try {
+      const response =
+        await fetch(
+          "/api/member/members",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                action,
+                userId:
+                  member.userId,
+              }),
+          },
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          await responseError(
+            response,
+          ),
+        );
+      }
+
+      await loadMembers();
+    } catch (cause) {
+      window.alert(
+        cause instanceof Error
+          ? cause.message
+          : "Impossible d'effectuer cette action.",
+      );
+    } finally {
+      setAccountAction(null);
+    }
+  }
+
+  async function changeRole(
+    member: MemberEntry,
+    role: Role,
+  ) {
+    if (
+      !member.userId ||
+      !canManageRoles ||
+      member.userId ===
+        currentUserId ||
+      role === member.role
+    ) {
+      return;
+    }
+
+    setAccountAction(
+      `role:${member.userId}`,
+    );
+
+    try {
+      const response =
+        await fetch(
+          "/api/member/members",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                action:
+                  "change_role",
+
+                userId:
+                  member.userId,
+
+                role,
+              }),
+          },
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          await responseError(
+            response,
+          ),
+        );
+      }
+
+      await loadMembers();
+    } catch (cause) {
+      window.alert(
+        cause instanceof Error
+          ? cause.message
+          : "Impossible de modifier le rôle.",
+      );
+    } finally {
+      setAccountAction(null);
+    }
+  }
+
+  async function removeMember(
+    member: MemberEntry,
+  ) {
+    if (
+      !member.membershipId
+    ) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Retirer ${fullName(member)} de la chorale ? Son accès au compte sera également révoqué.`,
+      )
+    ) {
+      return;
+    }
+
+    setAccountAction(
+      `delete:${member.membershipId}`,
+    );
+
+    setMenuMemberId(null);
+
+    try {
+      const response =
+        await fetch(
+          "/api/member/members",
+          {
+            method: "DELETE",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                id:
+                  member.membershipId,
+              }),
+          },
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          await responseError(
+            response,
+          ),
+        );
+      }
+
+      setSelected(null);
+
+      await loadMembers();
+    } catch (cause) {
+      window.alert(
+        cause instanceof Error
+          ? cause.message
+          : "Impossible de retirer ce membre.",
+      );
+    } finally {
+      setAccountAction(null);
+    }
+  }
+
+  return (
+    <>
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h1 className="text-3xl font-black tracking-[-0.03em] text-[#292923] sm:text-4xl">
+              Membres
+            </h1>
+
+            <p className="mt-2 text-sm text-[#77746c] sm:text-base">
+              Annuaire et gestion des membres de la chorale.
+            </p>
+          </div>
+
+          {canManage && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setImportOpen(true)
+                }
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#dcd8cf] bg-white px-4 text-sm font-bold text-[#626a5d] transition hover:bg-[#f7f8f5]"
+              >
+                <FileUp
+                  size={17}
+                />
+                Importer
+              </button>
+
+              <button
+                type="button"
+                onClick={openCreate}
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#687a5e] px-5 text-sm font-bold text-white transition hover:bg-[#58694f]"
+              >
+                <Plus size={17} />
+                Ajouter
+              </button>
+            </div>
+          )}
+        </div>
+
+        {canManage && (
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <button
+              type="button"
+              onClick={() =>
+                setStatusFilter(
+                  statusFilter ===
+                    "active"
+                    ? "all"
+                    : "active",
+                )
+              }
+              className={`rounded-2xl border bg-white p-5 text-left transition ${
+                statusFilter ===
+                "active"
+                  ? "border-[#8da081] ring-2 ring-[#687a5e]/10"
+                  : "border-[#e4e0d7] hover:border-[#cbd4c6]"
+              }`}
+            >
+              <UserCheck
+                size={20}
+                className="text-[#687a5e]"
+              />
+
+              <p className="mt-4 text-3xl font-black text-[#292923]">
+                {counts.active}
+              </p>
+
+              <p className="mt-1 text-sm font-bold text-[#77746c]">
+                Actifs
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setStatusFilter(
+                  statusFilter ===
+                    "not_registered"
+                    ? "all"
+                    : "not_registered",
+                )
+              }
+              className={`rounded-2xl border bg-white p-5 text-left transition ${
+                statusFilter ===
+                "not_registered"
+                  ? "border-[#aaa69c] ring-2 ring-black/5"
+                  : "border-[#e4e0d7] hover:border-[#d1cdc4]"
+              }`}
+            >
+              <Clock3
+                size={20}
+                className="text-[#77736b]"
+              />
+
+              <p className="mt-4 text-3xl font-black text-[#292923]">
+                {
+                  counts.not_registered
+                }
+              </p>
+
+              <p className="mt-1 text-sm font-bold text-[#77746c]">
+                Non inscrits
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setStatusFilter(
+                  statusFilter ===
+                    "pending"
+                    ? "all"
+                    : "pending",
+                )
+              }
+              className={`rounded-2xl border bg-white p-5 text-left transition ${
+                statusFilter ===
+                "pending"
+                  ? "border-amber-300 ring-2 ring-amber-100"
+                  : "border-[#e4e0d7] hover:border-amber-200"
+              }`}
+            >
+              <UsersRound
+                size={20}
+                className="text-amber-700"
+              />
+
+              <p className="mt-4 text-3xl font-black text-[#292923]">
+                {counts.pending}
+              </p>
+
+              <p className="mt-1 text-sm font-bold text-[#77746c]">
+                À valider
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setStatusFilter(
+                  statusFilter ===
+                    "rejected"
+                    ? "all"
+                    : "rejected",
+                )
+              }
+              className={`rounded-2xl border bg-white p-5 text-left transition ${
+                statusFilter ===
+                "rejected"
+                  ? "border-red-300 ring-2 ring-red-100"
+                  : "border-[#e4e0d7] hover:border-red-200"
+              }`}
+            >
+              <UserX
+                size={20}
+                className="text-red-600"
+              />
+
+              <p className="mt-4 text-3xl font-black text-[#292923]">
+                {counts.rejected}
+              </p>
+
+              <p className="mt-1 text-sm font-bold text-[#77746c]">
+                Refusés
+              </p>
+            </button>
+          </div>
+        )}
+
+        <section className="overflow-visible rounded-2xl border border-[#e5e1d8] bg-white">
+          <div className="flex flex-col gap-3 border-b border-[#ebe7de] p-4 lg:flex-row lg:items-end lg:p-5">
+            <div className="relative min-w-0 flex-1">
+              <Search
+                size={18}
+                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#88847c]"
+              />
+
+              <input
+                type="search"
+                value={search}
+                onChange={(event) =>
+                  setSearch(
+                    event.target.value,
+                  )
+                }
+                placeholder="Rechercher un membre (nom, email...)"
+                className="min-h-12 w-full rounded-xl border border-[#ddd9d0] bg-[#faf9f6] py-2.5 pl-11 pr-4 text-base outline-none transition focus:border-[#687a5e] focus:bg-white focus:ring-4 focus:ring-[#687a5e]/10"
+              />
+            </div>
+
+            {canManage && (
+              <>
+                <label className="min-w-44">
+                  <span className="mb-1.5 block text-xs font-bold text-[#77746c]">
+                    Statut
+                  </span>
+
+                  <select
+                    value={
+                      statusFilter
+                    }
+                    onChange={(
+                      event,
+                    ) =>
+                      setStatusFilter(
+                        event
+                          .target
+                          .value as StatusFilter,
+                      )
+                    }
+                    className="min-h-12 w-full rounded-xl border border-[#ddd9d0] bg-white px-3 text-sm font-semibold outline-none focus:border-[#687a5e]"
+                  >
+                    <option value="all">
+                      Tous les statuts
+                    </option>
+                    <option value="active">
+                      Actifs
+                    </option>
+                    <option value="not_registered">
+                      Pas encore inscrits
+                    </option>
+                    <option value="pending">
+                      À valider
+                    </option>
+                    <option value="rejected">
+                      Refusés
+                    </option>
+                  </select>
+                </label>
+
+                <label className="min-w-44">
+                  <span className="mb-1.5 block text-xs font-bold text-[#77746c]">
+                    Rôle
+                  </span>
+
+                  <select
+                    value={roleFilter}
+                    onChange={(
+                      event,
+                    ) =>
+                      setRoleFilter(
+                        event
+                          .target
+                          .value as RoleFilter,
+                      )
+                    }
+                    className="min-h-12 w-full rounded-xl border border-[#ddd9d0] bg-white px-3 text-sm font-semibold outline-none focus:border-[#687a5e]"
+                  >
+                    <option value="all">
+                      Tous les rôles
+                    </option>
+                    <option value="member">
+                      Membres
+                    </option>
+                    <option value="admin">
+                      Administrateurs
+                    </option>
+                    <option value="super_admin">
+                      Super administrateurs
+                    </option>
+                  </select>
+                </label>
+              </>
+            )}
+          </div>
+
+          {!loading &&
+            !error && (
+              <div className="flex items-center justify-between border-b border-[#eeeae2] px-4 py-3 sm:px-5">
+                <p className="text-sm font-bold text-[#37372f]">
+                  {
+                    filteredMembers.length
+                  }{" "}
+                  membre
+                  {filteredMembers.length !==
+                  1
+                    ? "s"
+                    : ""}
+                </p>
+
+                {canManage &&
+                  (
+                    statusFilter !==
+                      "all" ||
+                    roleFilter !==
+                      "all" ||
+                    search
+                  ) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearch("");
+                        setStatusFilter(
+                          "all",
+                        );
+                        setRoleFilter(
+                          "all",
+                        );
+                      }}
+                      className="text-xs font-bold text-[#687a5e] hover:underline"
+                    >
+                      Réinitialiser
+                    </button>
+                  )}
+              </div>
+            )}
+
+          {loading ? (
+            <div className="px-5 py-16 text-center text-sm text-[#77746c]">
+              Chargement des membres…
+            </div>
+          ) : error ? (
+            <div className="m-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+              {error}
+            </div>
+          ) : filteredMembers.length ===
+            0 ? (
+            <div className="px-5 py-16 text-center">
+              <UserRound
+                size={30}
+                className="mx-auto text-[#aaa69d]"
+              />
+
+              <p className="mt-3 font-bold">
+                Aucun membre trouvé
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-[#eeeae2]">
+              {paginatedMembers.map(
+                (member) => {
+                  const status =
+                    statusOf(
+                      member,
+                    );
+
+                  const rowKey =
+                    member.membershipId ??
+                    member.userId ??
+                    member.email;
+
+                  const pendingAction =
+                    Boolean(
+                      member.userId &&
+                      (
+                        status ===
+                          "pending" ||
+                        status ===
+                          "rejected"
+                      ) &&
+                      member.role ===
+                        "member",
+                    );
+
+                  const editable =
+                    canEditTarget(
+                      member,
+                    );
+
+                  const removable =
+                    canRemoveTarget(
+                      member,
+                    );
+
+                  const hasMenu =
+                    canManage &&
+                    (
+                      pendingAction ||
+                      editable ||
+                      removable
+                    );
+
+                  return (
+                    <div
+                      key={rowKey}
+                      className="relative flex items-center gap-3 px-4 py-4 transition hover:bg-[#fafbf9] sm:px-5"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelected(
+                            member,
+                          );
+                          setMenuMemberId(
+                            null,
+                          );
+                        }}
+                        className="flex min-w-0 flex-1 items-center gap-4 text-left"
+                      >
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#eaf0e6] text-sm font-black text-[#56674f]">
+                          {initials(
+                            member,
+                          )}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-base font-black text-[#292923]">
+                            {fullName(
+                              member,
+                            )}
+                          </p>
+
+                          <p className="mt-0.5 truncate text-sm text-[#77746c]">
+                            {
+                              member.email
+                            }
+                          </p>
+                        </div>
+
+                        {canManage && (
+                          <span
+                            className={`hidden shrink-0 rounded-full px-3 py-1.5 text-xs font-bold sm:inline-flex ${statusClasses(
+                              status,
+                            )}`}
+                          >
+                            {statusLabel(
+                              status,
+                            )}
+                          </span>
+                        )}
+
+                        <div className="hidden w-44 shrink-0 lg:block">
+                          <p className="text-sm font-bold text-[#3a3a33]">
+                            {roleLabel(
+                              member.role,
+                            )}
+                          </p>
+
+                          <p className="mt-0.5 text-xs text-[#89857d]">
+                            {member.userId
+                              ? "Compte créé"
+                              : "Sans compte"}
+                          </p>
+                        </div>
+                      </button>
+
+                      {hasMenu && (
+                        <div className="relative">
+                          <button
+                            type="button"
+                            aria-label="Actions"
+                            onClick={() =>
+                              setMenuMemberId(
+                                (
+                                  current,
+                                ) =>
+                                  current ===
+                                  rowKey
+                                    ? null
+                                    : rowKey,
+                              )
+                            }
+                            className="flex h-10 w-10 items-center justify-center rounded-xl text-[#716d65] transition hover:bg-[#efede7]"
+                          >
+                            <MoreHorizontal
+                              size={19}
+                            />
+                          </button>
+
+                          {menuMemberId ===
+                            rowKey && (
+                            <div className="absolute right-0 top-11 z-50 min-w-52 rounded-xl border border-[#e0dcd3] bg-white p-1.5 shadow-xl">
+                              {pendingAction && (
+                                <button
+                                  type="button"
+                                  disabled={
+                                    accountAction !==
+                                    null
+                                  }
+                                  onClick={() =>
+                                    void runUserAction(
+                                      member,
+                                      "approve",
+                                    )
+                                  }
+                                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-bold text-[#53684b] hover:bg-[#eef3eb]"
+                                >
+                                  <Check
+                                    size={15}
+                                  />
+                                  {status ===
+                                  "rejected"
+                                    ? "Réintégrer"
+                                    : "Approuver"}
+                                </button>
+                              )}
+
+                              {status ===
+                                "pending" &&
+                                member.userId &&
+                                member.role ===
+                                  "member" && (
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      accountAction !==
+                                      null
+                                    }
+                                    onClick={() =>
+                                      void runUserAction(
+                                        member,
+                                        "reject",
+                                      )
+                                    }
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-bold text-red-600 hover:bg-red-50"
+                                  >
+                                    <UserX
+                                      size={15}
+                                    />
+                                    Refuser
+                                  </button>
+                                )}
+
+                              {editable && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    openEdit(
+                                      member,
+                                    )
+                                  }
+                                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-bold hover:bg-[#f5f4ef]"
+                                >
+                                  <Pencil
+                                    size={15}
+                                  />
+                                  Modifier
+                                </button>
+                              )}
+
+                              {removable && (
+                                <button
+                                  type="button"
+                                  disabled={
+                                    accountAction !==
+                                    null
+                                  }
+                                  onClick={() =>
+                                    void removeMember(
+                                      member,
+                                    )
+                                  }
+                                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-bold text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2
+                                    size={15}
+                                  />
+                                  Retirer
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                },
+              )}
+            </div>
+          )}
+
+          {!loading &&
+            !error &&
+            filteredMembers.length > 0 &&
+            totalPages > 1 && (
+              <div className="flex flex-col gap-3 border-t border-[#eeeae2] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <p className="text-sm text-[#77746c]">
+                  Page {currentPage} sur {totalPages}
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={currentPage === 1}
+                    onClick={() =>
+                      setCurrentPage(
+                        (page) =>
+                          Math.max(
+                            1,
+                            page - 1,
+                          ),
+                      )
+                    }
+                    className="min-h-10 rounded-xl border border-[#ddd9d0] bg-white px-4 text-sm font-bold text-[#5f5c55] transition hover:bg-[#f7f6f2] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Précédent
+                  </button>
+
+                  <div className="hidden items-center gap-1 sm:flex">
+                    {Array.from(
+                      {
+                        length:
+                          totalPages,
+                      },
+                      (_, index) =>
+                        index + 1,
+                    )
+                      .filter(
+                        (page) =>
+                          page === 1 ||
+                          page ===
+                            totalPages ||
+                          Math.abs(
+                            page -
+                              currentPage,
+                          ) <= 1,
+                      )
+                      .map(
+                        (
+                          page,
+                          index,
+                          pages,
+                        ) => {
+                          const previous =
+                            pages[
+                              index - 1
+                            ];
+
+                          return (
+                            <div
+                              key={page}
+                              className="flex items-center gap-1"
+                            >
+                              {previous &&
+                                page -
+                                  previous >
+                                  1 && (
+                                  <span className="px-1 text-[#aaa69d]">
+                                    …
+                                  </span>
+                                )}
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setCurrentPage(
+                                    page,
+                                  )
+                                }
+                                className={`flex h-10 min-w-10 items-center justify-center rounded-xl px-3 text-sm font-bold transition ${
+                                  page ===
+                                  currentPage
+                                    ? "bg-[#687a5e] text-white"
+                                    : "border border-[#ddd9d0] bg-white text-[#5f5c55] hover:bg-[#f7f6f2]"
+                                }`}
+                              >
+                                {page}
+                              </button>
+                            </div>
+                          );
+                        },
+                      )}
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={
+                      currentPage ===
+                      totalPages
+                    }
+                    onClick={() =>
+                      setCurrentPage(
+                        (page) =>
+                          Math.min(
+                            totalPages,
+                            page + 1,
+                          ),
+                      )
+                    }
+                    className="min-h-10 rounded-xl border border-[#ddd9d0] bg-white px-4 text-sm font-bold text-[#5f5c55] transition hover:bg-[#f7f6f2] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Suivant
+                  </button>
+                </div>
+              </div>
+            )}
+        </section>
+      </div>
+
+      {selected && (
+        <div className="fixed inset-0 z-[280] flex justify-end bg-black/30 backdrop-blur-[1px]">
+          <button
+            type="button"
+            aria-label="Fermer"
+            onClick={() =>
+              setSelected(null)
+            }
+            className="absolute inset-0"
+          />
+
+          <aside className="relative z-10 flex h-full w-full max-w-[460px] flex-col border-l border-[#e3dfd6] bg-[#faf9f6] shadow-2xl">
+            <header className="flex shrink-0 items-center justify-end border-b border-[#e9e5dc] bg-white px-5 py-3">
+              <button
+                type="button"
+                aria-label="Fermer"
+                onClick={() =>
+                  setSelected(null)
+                }
+                className="flex h-10 w-10 items-center justify-center rounded-full transition hover:bg-[#f3f1eb]"
+              >
+                <X size={19} />
+              </button>
+            </header>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
+              <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#dfe8da] text-xl font-black text-[#53654c]">
+                  {initials(
+                    selected,
+                  )}
+                </div>
+
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="truncate text-2xl font-black text-[#292923]">
+                      {fullName(
+                        selected,
+                      )}
+                    </h2>
+
+                    {canManage && (
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-bold ${statusClasses(
+                          statusOf(
+                            selected,
+                          ),
+                        )}`}
+                      >
+                        {statusLabel(
+                          statusOf(
+                            selected,
+                          ),
+                        )}
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="mt-1 text-sm text-[#7b776f]">
+                    {roleLabel(
+                      selected.role,
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <section className="mt-7 rounded-2xl border border-[#e5e1d8] bg-white p-5">
+                <h3 className="font-black text-[#31312b]">
+                  Coordonnées
+                </h3>
+
+                <a
+                  href={`mailto:${selected.email}`}
+                  className="mt-4 flex items-center gap-3 text-sm font-semibold text-[#55544e] hover:text-[#687a5e]"
+                >
+                  <Mail
+                    size={17}
+                    className="shrink-0"
+                  />
+                  <span className="break-all">
+                    {
+                      selected.email
+                    }
+                  </span>
+                </a>
+
+                <div className="mt-3 flex items-center gap-3 text-sm text-[#55544e]">
+                  <Phone
+                    size={17}
+                    className="shrink-0"
+                  />
+
+                  {selected.phone ? (
+                    <a
+                      href={`tel:${selected.phone}`}
+                      className="font-semibold hover:text-[#687a5e]"
+                    >
+                      {
+                        selected.phone
+                      }
+                    </a>
+                  ) : (
+                    <span className="text-[#99958c]">
+                      Non renseigné
+                    </span>
+                  )}
+                </div>
+              </section>
+
+              {canManage && (
+                <section className="mt-4 rounded-2xl border border-[#e5e1d8] bg-white p-5">
+                  <h3 className="font-black text-[#31312b]">
+                    Adhésion et accès
+                  </h3>
+
+                  <div className="mt-4 space-y-3 text-sm">
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-[#77746c]">
+                        Liste officielle
+                      </span>
+
+                      <span className="font-bold text-[#34342e]">
+                        {selected.isOfficial
+                          ? "Oui"
+                          : "Non"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-[#77746c]">
+                        Compte
+                      </span>
+
+                      <span className="font-bold text-[#34342e]">
+                        {selected.userId
+                          ? "Créé"
+                          : "Pas encore créé"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-[#77746c]">
+                        Statut
+                      </span>
+
+                      <span className="font-bold text-[#34342e]">
+                        {statusLabel(
+                          statusOf(
+                            selected,
+                          ),
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              <section className="mt-4 rounded-2xl border border-[#e5e1d8] bg-white p-5">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck
+                    size={18}
+                    className="text-[#687a5e]"
+                  />
+
+                  <h3 className="font-black text-[#31312b]">
+                    Rôle
+                  </h3>
+                </div>
+
+                {canManageRoles &&
+                selected.userId &&
+                selected.userId !==
+                  currentUserId ? (
+                  <select
+                    value={
+                      selected.role
+                    }
+                    disabled={
+                      accountAction !==
+                      null
+                    }
+                    onChange={(
+                      event,
+                    ) =>
+                      void changeRole(
+                        selected,
+                        event
+                          .target
+                          .value as Role,
+                      )
+                    }
+                    className="mt-4 min-h-11 w-full rounded-xl border border-[#ddd9d0] bg-white px-3 text-sm font-bold outline-none focus:border-[#687a5e]"
+                  >
+                    <option value="member">
+                      Membre
+                    </option>
+                    <option value="admin">
+                      Administrateur
+                    </option>
+                    <option value="super_admin">
+                      Super administrateur
+                    </option>
+                  </select>
+                ) : (
+                  <div className="mt-4 rounded-xl bg-[#f5f4ef] px-4 py-3 text-sm font-bold text-[#525149]">
+                    {roleLabel(
+                      selected.role,
+                    )}
+                  </div>
+                )}
+
+                {!selected.userId && (
+                  <p className="mt-2 text-xs leading-5 text-[#8a867d]">
+                    Le rôle du compte pourra être modifié après l&apos;inscription.
+                  </p>
+                )}
+
+                {selected.userId ===
+                  currentUserId &&
+                  canManageRoles && (
+                    <p className="mt-2 text-xs leading-5 text-[#8a867d]">
+                      Votre propre rôle ne peut pas être modifié depuis cette page.
+                    </p>
+                  )}
+              </section>
+            </div>
+
+            {canManage && (
+              <footer className="shrink-0 border-t border-[#e5e1d8] bg-white p-4 sm:p-5">
+                <div className="flex flex-wrap justify-end gap-2">
+                  {(
+                    statusOf(
+                      selected,
+                    ) ===
+                      "pending" ||
+                    statusOf(
+                      selected,
+                    ) ===
+                      "rejected"
+                  ) &&
+                    selected.userId &&
+                    selected.role ===
+                      "member" && (
+                      <button
+                        type="button"
+                        disabled={
+                          accountAction !==
+                          null
+                        }
+                        onClick={() =>
+                          void runUserAction(
+                            selected,
+                            "approve",
+                          )
+                        }
+                        className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#687a5e] px-4 text-sm font-bold text-white disabled:opacity-50"
+                      >
+                        <Check
+                          size={16}
+                        />
+                        {statusOf(
+                          selected,
+                        ) ===
+                        "rejected"
+                          ? "Réintégrer"
+                          : "Approuver"}
+                      </button>
+                    )}
+
+                  {canEditTarget(
+                    selected,
+                  ) && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openEdit(
+                          selected,
+                        )
+                      }
+                      className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#dcd8cf] px-4 text-sm font-bold"
+                    >
+                      <Pencil
+                        size={16}
+                      />
+                      Modifier
+                    </button>
+                  )}
+
+                  {canRemoveTarget(
+                    selected,
+                  ) && (
+                    <button
+                      type="button"
+                      disabled={
+                        accountAction !==
+                        null
+                      }
+                      onClick={() =>
+                        void removeMember(
+                          selected,
+                        )
+                      }
+                      className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-red-200 px-4 text-sm font-bold text-red-600 disabled:opacity-50"
+                    >
+                      <Trash2
+                        size={16}
+                      />
+                      Retirer
+                    </button>
+                  )}
+                </div>
+              </footer>
+            )}
+          </aside>
+        </div>
+      )}
+
+      {formOpen && (
+        <div className="fixed inset-0 z-[320] flex items-end justify-center bg-black/40 backdrop-blur-[2px] sm:items-center sm:p-6">
+          <button
+            type="button"
+            aria-label="Fermer"
+            onClick={() =>
+              !saving &&
+              setFormOpen(false)
+            }
+            className="absolute inset-0"
+          />
+
+          <div className="relative z-10 w-full overflow-hidden rounded-t-[24px] border border-[#e5e1d7] bg-[#faf9f6] shadow-2xl sm:max-w-lg sm:rounded-[24px]">
+            <header className="flex items-center justify-between border-b border-[#e9e5dc] bg-white px-5 py-4 sm:px-6">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#817d74]">
+                  Membres
+                </p>
+
+                <h2 className="mt-1 text-xl font-black">
+                  {editingMember
+                    ? "Modifier le membre"
+                    : "Ajouter un membre"}
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() =>
+                  setFormOpen(false)
+                }
+                className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-[#f3f1eb]"
+              >
+                <X size={18} />
+              </button>
+            </header>
+
+            <form
+              onSubmit={saveMember}
+            >
+              <div className="space-y-4 p-5 sm:p-6">
+                {formError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                    {formError}
+                  </div>
+                )}
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label>
+                    <span className="mb-1.5 block text-sm font-bold">
+                      Prénom
+                    </span>
+
+                    <input
+                      value={
+                        form.firstname
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setForm({
+                          ...form,
+                          firstname:
+                            event
+                              .target
+                              .value,
+                        })
+                      }
+                      className="min-h-11 w-full rounded-xl border border-[#ddd9cf] bg-white px-4 outline-none focus:border-[#687a5e] focus:ring-4 focus:ring-[#687a5e]/10"
+                    />
+                  </label>
+
+                  <label>
+                    <span className="mb-1.5 block text-sm font-bold">
+                      Nom
+                    </span>
+
+                    <input
+                      value={
+                        form.lastname
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setForm({
+                          ...form,
+                          lastname:
+                            event
+                              .target
+                              .value,
+                        })
+                      }
+                      className="min-h-11 w-full rounded-xl border border-[#ddd9cf] bg-white px-4 outline-none focus:border-[#687a5e] focus:ring-4 focus:ring-[#687a5e]/10"
+                    />
+                  </label>
+                </div>
+
+                <label>
+                  <span className="mb-1.5 block text-sm font-bold">
+                    Email
+                  </span>
+
+                  <input
+                    type="email"
+                    value={form.email}
+                    disabled={Boolean(
+                      editingMember
+                        ?.userId,
+                    )}
+                    onChange={(
+                      event,
+                    ) =>
+                      setForm({
+                        ...form,
+                        email:
+                          event
+                            .target
+                            .value,
+                      })
+                    }
+                    className="min-h-11 w-full rounded-xl border border-[#ddd9cf] bg-white px-4 outline-none disabled:bg-[#f1efe9] disabled:text-[#77746c] focus:border-[#687a5e] focus:ring-4 focus:ring-[#687a5e]/10"
+                  />
+
+                  {editingMember?.userId && (
+                    <span className="mt-1.5 block text-xs text-[#858178]">
+                      L&apos;email ne peut plus être changé après la création du compte.
+                    </span>
+                  )}
+                </label>
+
+                <label>
+                  <span className="mb-1.5 block text-sm font-bold">
+                    Téléphone
+                  </span>
+
+                  <input
+                    type="tel"
+                    value={form.phone}
+                    onChange={(
+                      event,
+                    ) =>
+                      setForm({
+                        ...form,
+                        phone:
+                          event
+                            .target
+                            .value,
+                      })
+                    }
+                    placeholder="Facultatif"
+                    className="min-h-11 w-full rounded-xl border border-[#ddd9cf] bg-white px-4 outline-none focus:border-[#687a5e] focus:ring-4 focus:ring-[#687a5e]/10"
+                  />
+                </label>
+              </div>
+
+              <footer className="flex justify-end gap-2 border-t border-[#e9e5dc] bg-white px-5 py-4 sm:px-6">
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() =>
+                    setFormOpen(
+                      false,
+                    )
+                  }
+                  className="min-h-11 rounded-xl border border-[#ddd9cf] px-4 text-sm font-bold"
+                >
+                  Annuler
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="min-h-11 rounded-xl bg-[#687a5e] px-5 text-sm font-bold text-white disabled:opacity-50"
+                >
+                  {saving
+                    ? "Enregistrement…"
+                    : editingMember
+                      ? "Enregistrer"
+                      : "Ajouter"}
+                </button>
+              </footer>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <MemberImportDialog
+        open={importOpen}
+        existingMembers={
+          members
+        }
+        onClose={() =>
+          setImportOpen(false)
+        }
+        onImported={() => {
+          setImportOpen(false);
+          void loadMembers();
+        }}
+      />
+    </>
+  );
+}
