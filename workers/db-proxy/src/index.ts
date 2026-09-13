@@ -1,6 +1,13 @@
 import { Env, isAuthorized, json } from "./http";
 
 import {
+  deleteUserAvatar,
+  serveUserAvatar,
+  updateUserPassword,
+  uploadUserAvatar,
+} from "./account";
+
+import {
   checkAuthorizedEmail,
   createUser,
   findUserByEmail,
@@ -47,18 +54,48 @@ import {
   updateMember,
 } from "./members";
 
+import {
+  createSong,
+  deleteResourceFile,
+  deleteSong,
+  handlePublicResourceRequest,
+  listResources,
+  serveResourceFile,
+  updateResourceFile,
+  updateSong,
+  uploadResourceFile,
+} from "./resources";
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    if (!isAuthorized(request, env)) {
-      return json(
-        {
-          error: "Unauthorized",
-        },
-        401,
-      );
-    }
-
     try {
+      /*
+       * PUBLIC ROUTES PROTECTED
+       * BY SHORT-LIVED SIGNED TOKENS
+       */
+
+      const publicResourceResponse = await handlePublicResourceRequest(
+        request,
+        env,
+      );
+
+      if (publicResourceResponse) {
+        return publicResourceResponse;
+      }
+
+      /*
+       * INTERNAL API
+       */
+
+      if (!isAuthorized(request, env)) {
+        return json(
+          {
+            error: "Unauthorized",
+          },
+          401,
+        );
+      }
+
       const url = new URL(request.url);
 
       if (request.method === "GET" && url.pathname === "/health") {
@@ -85,6 +122,67 @@ export default {
             private_storage: true,
           },
         });
+      }
+
+      /*
+       * RESOURCES
+       */
+
+      if (request.method === "GET" && url.pathname === "/v1/resources") {
+        return listResources(request, env);
+      }
+
+      if (request.method === "POST" && url.pathname === "/v1/resources/songs") {
+        return createSong(request, env);
+      }
+
+      if (
+        request.method === "PATCH" &&
+        url.pathname === "/v1/resources/songs"
+      ) {
+        return updateSong(request, env);
+      }
+
+      if (
+        request.method === "DELETE" &&
+        url.pathname === "/v1/resources/songs"
+      ) {
+        return deleteSong(request, env);
+      }
+
+      if (request.method === "POST" && url.pathname === "/v1/resource-files") {
+        return uploadResourceFile(request, env);
+      }
+
+      if (request.method === "PATCH" && url.pathname === "/v1/resource-files") {
+        return updateResourceFile(request, env);
+      }
+
+      if (
+        request.method === "DELETE" &&
+        url.pathname === "/v1/resource-files"
+      ) {
+        return deleteResourceFile(request, env);
+      }
+
+      if (
+        request.method === "GET" &&
+        url.pathname.startsWith("/v1/resource-files/")
+      ) {
+        const id = decodeURIComponent(
+          url.pathname.slice("/v1/resource-files/".length),
+        );
+
+        if (!id) {
+          return json(
+            {
+              error: "Resource ID is required",
+            },
+            400,
+          );
+        }
+
+        return serveResourceFile(request, env, id, true);
       }
 
       /*
@@ -235,6 +333,22 @@ export default {
 
       if (request.method === "PATCH" && url.pathname === "/v1/users/profile") {
         return updateUserProfile(request, env);
+      }
+
+      if (request.method === "PATCH" && url.pathname === "/v1/users/password") {
+        return updateUserPassword(request, env);
+      }
+
+      if (request.method === "GET" && url.pathname === "/v1/users/avatar") {
+        return serveUserAvatar(request, env);
+      }
+
+      if (request.method === "POST" && url.pathname === "/v1/users/avatar") {
+        return uploadUserAvatar(request, env);
+      }
+
+      if (request.method === "DELETE" && url.pathname === "/v1/users/avatar") {
+        return deleteUserAvatar(request, env);
       }
 
       /*

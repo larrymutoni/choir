@@ -8,14 +8,11 @@ export type DashboardIconKey =
   | "calendar"
   | "directory"
   | "resources"
-  | "memberGallery"
   | "profile"
+  | "events"
   | "content"
   | "images"
   | "siteGallery"
-  | "events"
-  | "users"
-  | "emails"
   | "settings";
 
 export type DashboardNavigationItem = {
@@ -23,7 +20,7 @@ export type DashboardNavigationItem = {
   href: string;
   iconKey: DashboardIconKey;
   roles: DashboardRole[];
-  comingSoon?: boolean;
+  group: "main" | "management" | "account";
 };
 
 const ALL_ROLES: DashboardRole[] = [
@@ -44,68 +41,72 @@ export const dashboardNavigationItems:
       href: "/membre",
       iconKey: "dashboard",
       roles: ALL_ROLES,
+      group: "main",
     },
     {
       label: "Calendrier",
       href: "/membre/calendrier",
       iconKey: "calendar",
       roles: ALL_ROLES,
+      group: "main",
     },
     {
       label: "Membres",
       href: "/membre/repertoire",
       iconKey: "directory",
       roles: ALL_ROLES,
+      group: "main",
     },
     {
-      label: "Ressources",
+      label: "Répertoire",
       href: "/membre/ressources",
       iconKey: "resources",
       roles: ALL_ROLES,
-      comingSoon: true,
+      group: "main",
     },
-    {
-      label: "Galerie membres",
-      href: "/membre/galerie",
-      iconKey: "memberGallery",
-      roles: ALL_ROLES,
-      comingSoon: true,
-    },
-    {
-      label: "Mon profil",
-      href: "/membre/profil",
-      iconKey: "profile",
-      roles: ALL_ROLES,
-    },
+
     {
       label: "Événements",
       href: "/admin/evenements",
       iconKey: "events",
       roles: MANAGEMENT_ROLES,
+      group: "management",
     },
     {
       label: "Contenu",
       href: "/admin/contenu",
       iconKey: "content",
       roles: MANAGEMENT_ROLES,
+      group: "management",
     },
     {
-      label: "Images site",
+      label: "Images",
       href: "/admin/images",
       iconKey: "images",
       roles: MANAGEMENT_ROLES,
+      group: "management",
     },
     {
-      label: "Galerie du site",
+      label: "Galerie",
       href: "/admin/galerie",
       iconKey: "siteGallery",
       roles: MANAGEMENT_ROLES,
+      group: "management",
     },
     {
       label: "Paramètres",
       href: "/admin/settings",
       iconKey: "settings",
       roles: MANAGEMENT_ROLES,
+      group: "management",
+    },
+
+    {
+      label: "Mon profil",
+      href: "/membre/profil",
+      iconKey: "profile",
+      roles: ALL_ROLES,
+      group: "account",
     },
   ];
 
@@ -121,9 +122,7 @@ export function getDashboardNavigation(
 export function getRoleLabel(
   role: DashboardRole,
 ) {
-  if (
-    role === "super_admin"
-  ) {
+  if (role === "super_admin") {
     return "Super administrateur";
   }
 

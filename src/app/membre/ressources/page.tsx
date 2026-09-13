@@ -1,10 +1,9 @@
-import { ComingSoon } from "@/components/dashboard/ComingSoon";
+import { ResourcesLibrary } from "@/components/resources/ResourcesLibrary";
 
-export default function ResourcesPage() {
-  return (
-    <ComingSoon
-      title="Ressources"
-      description="Les ressources réservées aux membres seront disponibles ici."
-    />
-  );
+import { requireUser } from "@/server/auth/guard";
+
+export default async function ResourcesPage() {
+  await requireUser();
+
+  return <ResourcesLibrary />;
 }

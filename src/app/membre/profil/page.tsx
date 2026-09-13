@@ -1,26 +1,43 @@
-import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import ProfileForm from "@/components/ProfileForm";
-import { requireUser } from "@/server/auth/guard";
-import { getMemberProfile } from "@/server/auth/service";
+
+import {
+  requireUser,
+} from "@/server/auth/guard";
+
+import {
+  getAccountProfile,
+} from "@/server/auth/account";
 
 export default async function ProfilePage() {
-  const session = await requireUser();
-  const profile = await getMemberProfile(session.email);
+  const session =
+    await requireUser();
+
+  const profile =
+    await getAccountProfile(
+      session.email,
+    );
 
   if (!profile) {
     return null;
   }
 
   return (
-    <main>
-      <DashboardHeader
-        title="Mon profil"
-        description="Gérez vos informations personnelles."
-      />
+    <main className="mx-auto w-full max-w-5xl">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-[-0.03em] text-[#292923]">
+          Mon profil
+        </h1>
 
-      <div className="max-w-3xl">
-        <ProfileForm profile={profile} />
+        <p className="mt-1 text-sm text-[#817d74]">
+          Gérez vos informations personnelles et la sécurité de votre compte.
+        </p>
       </div>
+
+      <ProfileForm
+        profile={
+          profile
+        }
+      />
     </main>
   );
 }
