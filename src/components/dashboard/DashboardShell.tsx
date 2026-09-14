@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
+
 import {
-  BookOpen,
-  CalendarDays,
   CalendarRange,
   ChevronDown,
   ExternalLink,
@@ -16,10 +15,22 @@ import {
   Settings,
   Type,
   UserRound,
+  UsersRound,
   X,
 } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  usePathname,
+  useRouter,
+} from "next/navigation";
+
+import NotificationBell from "@/components/dashboard/NotificationBell";
+import { ToastViewport } from "@/components/ui/ToastViewport";
 
 import {
   getRoleLabel,
@@ -33,6 +44,7 @@ type DashboardUser = {
   lastname: string;
   email: string;
   role: DashboardRole;
+  avatarKey: string | null;
 };
 
 type DashboardShellProps = {
@@ -47,45 +59,69 @@ function NavigationIcon({
   iconKey: DashboardIconKey;
 }) {
   if (iconKey === "dashboard") {
-    return <LayoutDashboard size={18} />;
+    return (
+      <LayoutDashboard
+        size={18}
+      />
+    );
   }
 
   if (iconKey === "calendar") {
-    return <CalendarRange size={18} />;
-  }
-
-  if (iconKey === "directory") {
-    return <BookOpen size={18} />;
+    return (
+      <CalendarRange
+        size={18}
+      />
+    );
   }
 
   if (iconKey === "resources") {
-    return <FolderOpen size={18} />;
+    return (
+      <FolderOpen
+        size={18}
+      />
+    );
   }
 
-  if (iconKey === "events") {
-    return <CalendarDays size={18} />;
+  if (iconKey === "members") {
+    return (
+      <UsersRound
+        size={18}
+      />
+    );
   }
 
   if (iconKey === "content") {
-    return <Type size={18} />;
+    return (
+      <Type
+        size={18}
+      />
+    );
   }
 
   if (
     iconKey === "images" ||
     iconKey === "siteGallery"
   ) {
-    return <ImageIcon size={18} />;
+    return (
+      <ImageIcon
+        size={18}
+      />
+    );
   }
 
   if (iconKey === "settings") {
-    return <Settings size={18} />;
+    return (
+      <Settings
+        size={18}
+      />
+    );
   }
 
-  if (iconKey === "profile") {
-    return <UserRound size={18} />;
-  }
-
-  return <LayoutDashboard size={18} />;
+  return (
+    <LayoutDashboard
+      size={18}
+    />
+  );
 }
 
 function isActive(
@@ -93,7 +129,9 @@ function isActive(
   href: string,
 ) {
   if (href === "/membre") {
-    return pathname === "/membre";
+    return (
+      pathname === "/membre"
+    );
   }
 
   return (
@@ -118,8 +156,7 @@ export function DashboardShell({
   const mainLinks =
     links.filter(
       (link) =>
-        link.group ===
-        "main",
+        link.group === "main",
     );
 
   const managementLinks =
@@ -129,56 +166,83 @@ export function DashboardShell({
         "management",
     );
 
-  const accountLinks =
-    links.filter(
-      (link) =>
-        link.group ===
-        "account",
-    );
-
-  const managementActive =
-    managementLinks.some(
-      (link) =>
-        isActive(
-          pathname,
-          link.href,
-        ),
-    );
-
   const [
     mobileOpen,
     setMobileOpen,
-  ] =
-    useState(false);
+  ] = useState(false);
 
   const [
     managementOpen,
     setManagementOpen,
-  ] = useState(
-    managementActive,
-  );
+  ] = useState(true);
+
+  const [
+    profileOpen,
+    setProfileOpen,
+  ] = useState(false);
+
+  const [
+    avatarFailed,
+    setAvatarFailed,
+  ] = useState(false);
 
   const [
     loggingOut,
     setLoggingOut,
-  ] =
-    useState(false);
+  ] = useState(false);
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [user.avatarKey]);
+
+  const currentLink =
+    [
+      ...mainLinks,
+      ...managementLinks,
+    ].find((link) =>
+      isActive(
+        pathname,
+        link.href,
+      ),
+    );
+
+  const pageTitle =
+    pathname ===
+    "/membre/profil"
+      ? "Mon profil"
+      : currentLink?.label ??
+        (pathname.startsWith(
+          "/admin",
+        )
+          ? "Administration"
+          : "Espace membre");
+
+  const initials =
+    `${user.firstname.charAt(
+      0,
+    )}${user.lastname.charAt(
+      0,
+    )}`.toUpperCase();
+
+  const avatarUrl =
+    user.avatarKey
+      ? `/api/member/profile/avatar?v=${encodeURIComponent(
+          user.avatarKey,
+        )}`
+      : null;
 
   async function logout() {
     if (loggingOut) {
       return;
     }
 
-    setLoggingOut(
-      true,
-    );
+    setLoggingOut(true);
 
     try {
       await fetch(
         "/api/auth/logout",
         {
-          method:
-            "POST",
+          method: "POST",
         },
       );
     } finally {
@@ -188,6 +252,46 @@ export function DashboardShell({
 
       router.refresh();
     }
+  }
+
+  function UserAvatar({
+    size = "md",
+  }: {
+    size?: "sm" | "md";
+  }) {
+    const sizeClass =
+      size === "sm"
+        ? "h-9 w-9 text-[11px]"
+        : "h-10 w-10 text-xs";
+
+    return (
+      <div
+        className={[
+          "flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-900 font-bold text-white ring-1 ring-slate-200",
+          sizeClass,
+        ].join(" ")}
+      >
+        {avatarUrl &&
+        !avatarFailed ? (
+          <img
+            key={
+              user.avatarKey ??
+              "avatar"
+            }
+            src={avatarUrl}
+            alt={`${user.firstname} ${user.lastname}`}
+            onError={() =>
+              setAvatarFailed(
+                true,
+              )
+            }
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          initials
+        )}
+      </div>
+    );
   }
 
   function NavLink({
@@ -217,21 +321,21 @@ export function DashboardShell({
           }
         }}
         className={[
-          "group flex items-center gap-3 rounded-xl transition",
+          "group flex items-center gap-3 rounded-lg transition-all duration-150",
           compact
             ? "min-h-9 px-3 py-1.5 text-[13px]"
             : "min-h-10 px-3 py-2 text-sm",
           active
-            ? "bg-[#e7ece3] font-bold text-[#1f1f1a]"
-            : "font-semibold text-[#68665f] hover:bg-white hover:text-[#1f1f1a]",
+            ? "bg-slate-900 font-semibold text-white shadow-sm"
+            : "font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-950",
         ].join(" ")}
       >
         <span
           className={[
             "shrink-0 transition",
             active
-              ? "text-[#687a5e]"
-              : "text-[#9a9991] group-hover:text-[#687a5e]",
+              ? "text-white"
+              : "text-slate-400 group-hover:text-slate-700",
           ].join(" ")}
         >
           <NavigationIcon
@@ -255,124 +359,91 @@ export function DashboardShell({
   }) {
     return (
       <div className="flex min-h-full flex-col">
-        <nav className="space-y-1">
-          {mainLinks.map(
-            (link) => (
-              <NavLink
-                key={
-                  link.href
-                }
-                link={link}
-                mobile={
-                  mobile
-                }
-              />
-            ),
-          )}
-
-          {managementLinks.length >
-            0 && (
-            <div className="pt-3">
-              <button
-                type="button"
-                onClick={() =>
-                  setManagementOpen(
-                    (
-                      current,
-                    ) =>
-                      !current,
-                  )
-                }
-                className={[
-                  "group flex min-h-10 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition",
-                  managementActive
-                    ? "bg-[#f0f2ed] font-bold text-[#1f1f1a]"
-                    : "font-semibold text-[#68665f] hover:bg-white hover:text-[#1f1f1a]",
-                ].join(
-                  " ",
-                )}
-              >
-                <span
-                  className={
-                    managementActive
-                      ? "text-[#687a5e]"
-                      : "text-[#9a9991]"
+        <div>
+          <nav className="space-y-1">
+            {mainLinks.map(
+              (link) => (
+                <NavLink
+                  key={
+                    link.href
                   }
-                >
-                  <PanelsTopLeft
-                    size={
-                      18
-                    }
-                  />
-                </span>
-
-                <span className="min-w-0 flex-1 truncate">
-                  Gestion du site
-                </span>
-
-                <ChevronDown
-                  size={15}
-                  className={[
-                    "shrink-0 text-[#99968e] transition-transform duration-200",
-                    managementOpen
-                      ? "rotate-180"
-                      : "",
-                  ].join(
-                    " ",
-                  )}
+                  link={link}
+                  mobile={
+                    mobile
+                  }
                 />
-              </button>
+              ),
+            )}
+          </nav>
+        </div>
 
-              {managementOpen && (
-                <div className="ml-[21px] mt-1 space-y-0.5 border-l border-[#dedbd2] pl-3">
-                  {managementLinks.map(
-                    (
-                      link,
-                    ) => (
-                      <NavLink
-                        key={
-                          link.href
-                        }
-                        link={
-                          link
-                        }
-                        mobile={
-                          mobile
-                        }
-                        compact
-                      />
-                    ),
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </nav>
-
-        <div className="mt-auto space-y-1 pt-6">
-          {accountLinks.map(
-            (link) => (
-              <NavLink
-                key={
-                  link.href
-                }
-                link={link}
-                mobile={
-                  mobile
-                }
+        {managementLinks.length >
+          0 && (
+          <div className="mt-7">
+            <button
+              type="button"
+              onClick={() =>
+                setManagementOpen(
+                  (current) =>
+                    !current,
+                )
+              }
+              className="mb-2 flex w-full items-center gap-2 px-3 text-left"
+            >
+              <PanelsTopLeft
+                size={14}
+                className="text-slate-400"
               />
-            ),
-          )}
 
+              <span className="flex-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                Administration
+              </span>
+
+              <ChevronDown
+                size={14}
+                className={[
+                  "text-slate-400 transition-transform",
+                  managementOpen
+                    ? "rotate-180"
+                    : "",
+                ].join(" ")}
+              />
+            </button>
+
+            {managementOpen && (
+              <nav className="space-y-1">
+                {managementLinks.map(
+                  (link) => (
+                    <NavLink
+                      key={
+                        link.href
+                      }
+                      link={
+                        link
+                      }
+                      mobile={
+                        mobile
+                      }
+                      compact
+                    />
+                  ),
+                )}
+              </nav>
+            )}
+          </div>
+        )}
+
+        <div className="mt-auto pt-8">
           <a
             href="/"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold text-[#817e75] transition hover:bg-white hover:text-[#1f1f1a]"
+            className="flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
           >
             <ExternalLink
               size={17}
             />
+
             Voir le site public
           </a>
         </div>
@@ -380,104 +451,196 @@ export function DashboardShell({
     );
   }
 
-  const initials =
-    `${user.firstname.charAt(
-      0,
-    )}${user.lastname.charAt(
-      0,
-    )}`.toUpperCase();
-
   return (
-    <div className="min-h-screen bg-[#f7f5ef] lg:flex lg:h-screen lg:overflow-hidden">
-      <aside className="hidden w-[228px] shrink-0 border-r border-[#e6e1d6] bg-[#f7f5ef] lg:flex lg:h-screen lg:flex-col">
-        <div className="flex h-[104px] shrink-0 items-center px-5">
-          <Link href="/membre">
+    <div className="min-h-screen bg-slate-50 lg:flex lg:h-screen lg:overflow-hidden">
+      <ToastViewport />
+
+      <aside className="hidden w-[230px] shrink-0 border-r border-slate-200 bg-white lg:flex lg:h-screen lg:flex-col">
+        <div className="flex h-[72px] shrink-0 items-center border-b border-slate-100 px-5">
+          <Link
+            href="/membre"
+          >
             <img
               src="/images/logo-chorale.png"
               alt="Chorale Rayon de Soleil Lyon 6"
-              className="max-h-[68px] w-[108px] object-contain object-left"
+              className="max-h-[52px] w-[96px] object-contain object-left"
             />
           </Link>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-5">
           <Navigation />
         </div>
       </aside>
 
       <div className="min-w-0 flex-1 lg:flex lg:h-screen lg:flex-col lg:overflow-hidden">
-        <header className="hidden h-16 shrink-0 items-center justify-end border-b border-[#e6e1d6] bg-[#f7f5ef] px-8 lg:flex">
+        <header className="hidden h-[72px] shrink-0 items-center justify-between border-b border-slate-200 bg-white px-7 lg:flex">
+          <h1 className="truncate text-lg font-semibold tracking-[-0.02em] text-slate-950">
+            {pageTitle}
+          </h1>
+
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e6ebe2] text-xs font-black text-[#687a5e]">
-              {initials}
-            </div>
+            <NotificationBell />
 
-            <div className="min-w-0">
-              <p className="max-w-44 truncate text-sm font-bold text-[#1f1f1a]">
-                {
-                  user.firstname
-                }{" "}
-                {
-                  user.lastname
+            <div className="h-7 w-px bg-slate-200" />
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() =>
+                  setProfileOpen(
+                    (current) =>
+                      !current,
+                  )
                 }
-              </p>
+                className={[
+                  "flex items-center gap-2.5 rounded-xl border px-2.5 py-1.5 text-left transition",
+                  profileOpen
+                    ? "border-slate-300 bg-slate-100"
+                    : "border-transparent hover:border-slate-200 hover:bg-slate-50",
+                ].join(" ")}
+              >
+                <UserAvatar />
 
-              <p className="text-[10px] font-semibold text-[#8a877f]">
-                {getRoleLabel(
-                  user.role,
-                )}
-              </p>
+                <div className="min-w-0 pr-1">
+                  <p className="max-w-40 truncate text-sm font-semibold text-slate-900">
+                    {
+                      user.firstname
+                    }{" "}
+                    {
+                      user.lastname
+                    }
+                  </p>
+
+                  <p className="text-[11px] text-slate-500">
+                    {getRoleLabel(
+                      user.role,
+                    )}
+                  </p>
+                </div>
+
+                <ChevronDown
+                  size={14}
+                  className={[
+                    "text-slate-400 transition-transform",
+                    profileOpen
+                      ? "rotate-180"
+                      : "",
+                  ].join(" ")}
+                />
+              </button>
+
+              {profileOpen && (
+                <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-[280px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10">
+                  <div className="flex items-start gap-3 border-b border-slate-100 px-4 py-4">
+                    <UserAvatar />
+
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-950">
+                        {
+                          user.firstname
+                        }{" "}
+                        {
+                          user.lastname
+                        }
+                      </p>
+
+                      <p className="mt-0.5 truncate text-xs text-slate-500">
+                        {user.email}
+                      </p>
+
+                      <p className="mt-1 text-[11px] font-medium text-slate-400">
+                        {getRoleLabel(
+                          user.role,
+                        )}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setProfileOpen(
+                          false,
+                        )
+                      }
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                      aria-label="Fermer"
+                    >
+                      <X
+                        size={
+                          15
+                        }
+                      />
+                    </button>
+                  </div>
+
+                  <div className="p-2">
+                    <Link
+                      href="/membre/profil"
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-950"
+                    >
+                      <UserRound
+                        size={
+                          17
+                        }
+                      />
+
+                      Mon profil
+                    </Link>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void logout()
+                      }
+                      disabled={
+                        loggingOut
+                      }
+                      className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 disabled:opacity-50"
+                    >
+                      <LogOut
+                        size={
+                          17
+                        }
+                      />
+
+                      {loggingOut
+                        ? "Déconnexion..."
+                        : "Se déconnecter"}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                void logout()
-              }
-              disabled={
-                loggingOut
-              }
-              className="ml-2 flex h-9 w-9 items-center justify-center rounded-xl text-[#8c8981] transition hover:bg-white hover:text-[#1f1f1a]"
-              aria-label="Se déconnecter"
-            >
-              <LogOut
-                size={17}
-              />
-            </button>
           </div>
         </header>
 
-        <header className="sticky top-0 z-40 border-b border-[#e6e1d6] bg-[#f7f5ef]/95 backdrop-blur-xl lg:hidden">
+        <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur-xl lg:hidden">
           <div className="flex h-16 items-center justify-between px-4">
-            <Link
-              href="/membre"
-              onClick={() =>
-                setMobileOpen(
-                  false,
-                )
-              }
-            >
-              <img
-                src="/images/logo-chorale.png"
-                alt="Chorale Rayon de Soleil Lyon 6"
-                className="max-h-11 w-[88px] object-contain object-left"
-              />
-            </Link>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-slate-900">
+                {pageTitle}
+              </p>
+            </div>
 
-            <button
-              type="button"
-              onClick={() =>
-                setMobileOpen(
-                  true,
-                )
-              }
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-[#1f1f1a] hover:bg-white"
-              aria-label="Ouvrir le menu"
-            >
-              <Menu
-                size={20}
-              />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <NotificationBell />
+
+              <button
+                type="button"
+                onClick={() =>
+                  setMobileOpen(
+                    true,
+                  )
+                }
+                className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-800 hover:bg-slate-100"
+                aria-label="Ouvrir le menu"
+              >
+                <Menu
+                  size={20}
+                />
+              </button>
+            </div>
           </div>
         </header>
 
@@ -490,12 +653,12 @@ export function DashboardShell({
                   false,
                 )
               }
-              className="absolute inset-0 bg-black/25 backdrop-blur-[2px]"
+              className="absolute inset-0 bg-slate-950/30 backdrop-blur-[2px]"
               aria-label="Fermer le menu"
             />
 
-            <aside className="absolute right-0 top-0 flex h-full w-[min(86vw,320px)] flex-col bg-[#f7f5ef] shadow-2xl">
-              <div className="flex h-16 items-center justify-between border-b border-[#e6e1d6] px-4">
+            <aside className="absolute right-0 top-0 flex h-full w-[min(86vw,320px)] flex-col bg-white shadow-2xl">
+              <div className="flex h-16 items-center justify-between border-b border-slate-200 px-4">
                 <img
                   src="/images/logo-chorale.png"
                   alt="Chorale Rayon de Soleil Lyon 6"
@@ -509,8 +672,8 @@ export function DashboardShell({
                       false,
                     )
                   }
-                  className="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-white"
-                  aria-label="Fermer le menu"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg hover:bg-slate-100"
+                  aria-label="Fermer"
                 >
                   <X
                     size={19}
@@ -518,40 +681,45 @@ export function DashboardShell({
                 </button>
               </div>
 
-              <div className="border-b border-[#e6e1d6] px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e6ebe2] text-xs font-black text-[#687a5e]">
+              <Link
+                href="/membre/profil"
+                onClick={() =>
+                  setMobileOpen(
+                    false,
+                  )
+                }
+                className="flex items-center gap-3 border-b border-slate-200 px-4 py-4 transition hover:bg-slate-50"
+              >
+                <UserAvatar />
+
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-slate-900">
                     {
-                      initials
+                      user.firstname
+                    }{" "}
+                    {
+                      user.lastname
                     }
-                  </div>
+                  </p>
 
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-[#1f1f1a]">
-                      {
-                        user.firstname
-                      }{" "}
-                      {
-                        user.lastname
-                      }
-                    </p>
-
-                    <p className="text-[10px] font-semibold text-[#8a877f]">
-                      {getRoleLabel(
-                        user.role,
-                      )}
-                    </p>
-                  </div>
+                  <p className="mt-0.5 truncate text-xs text-slate-500">
+                    {user.email}
+                  </p>
                 </div>
-              </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+                <UserRound
+                  size={17}
+                  className="text-slate-400"
+                />
+              </Link>
+
+              <div className="min-h-0 flex-1 overflow-y-auto px-3 py-5">
                 <Navigation
                   mobile
                 />
               </div>
 
-              <div className="border-t border-[#e6e1d6] p-3">
+              <div className="border-t border-slate-200 p-3">
                 <button
                   type="button"
                   onClick={() =>
@@ -560,7 +728,7 @@ export function DashboardShell({
                   disabled={
                     loggingOut
                   }
-                  className="flex min-h-10 w-full items-center gap-3 rounded-xl px-3 text-sm font-semibold text-[#77746d] hover:bg-white"
+                  className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-slate-600 hover:bg-slate-100"
                 >
                   <LogOut
                     size={17}
@@ -575,11 +743,11 @@ export function DashboardShell({
           </div>
         )}
 
-        <div className="min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-8 xl:px-10">
-          <div className="mx-auto w-full max-w-[1400px]">
+        <main className="min-w-0 flex-1 overflow-y-auto bg-slate-50 px-4 py-5 sm:px-6 lg:px-7 lg:py-6 xl:px-8">
+          <div className="mx-auto w-full max-w-[1440px]">
             {children}
           </div>
-        </div>
+        </main>
       </div>
     </div>
   );

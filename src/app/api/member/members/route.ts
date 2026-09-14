@@ -101,31 +101,29 @@ export async function GET() {
     );
   }
 
+  if (
+    !canManage(
+      session.role,
+    )
+  ) {
+    return NextResponse.json(
+      {
+        message: "Forbidden.",
+      },
+      {
+        status: 403,
+      },
+    );
+  }
+
   try {
     const entries =
       await listMemberEntries();
 
-    const management =
-      canManage(
-        session.role,
-      );
-
-    const visibleEntries =
-      management
-        ? entries
-        : entries.filter(
-            (entry) =>
-              entry.isOfficial &&
-              entry.accountStatus ===
-                "active",
-          );
-
     return NextResponse.json({
-      members:
-        visibleEntries,
+      members: entries,
 
-      canManage:
-        management,
+      canManage: true,
 
       canManageRoles:
         session.role ===

@@ -2,6 +2,8 @@
 
 import {
   Check,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   FileUp,
   Mail,
@@ -29,6 +31,10 @@ import {
 import {
   MemberImportDialog,
 } from "@/components/directory/MemberImportDialog";
+
+import {
+  showToast,
+} from "@/lib/toast";
 
 type Role =
   | "member"
@@ -117,10 +123,10 @@ function initials(
 function fullName(
   member: MemberEntry,
 ) {
-  const value =
-    `${member.firstname} ${member.lastname}`.trim();
-
-  return value || member.email;
+  return (
+    `${member.firstname} ${member.lastname}`.trim() ||
+    member.email
+  );
 }
 
 function roleLabel(
@@ -145,13 +151,6 @@ function statusOf(
   StatusFilter,
   "all"
 > {
-  /*
-   * Important:
-   * an already-active account is active.
-   * It must never appear as a new pending
-   * registration simply because it predates
-   * the members table.
-   */
   if (
     member.accountStatus ===
     "active"
@@ -192,7 +191,7 @@ function statusLabel(
     status ===
     "not_registered"
   ) {
-    return "Pas encore inscrit";
+    return "Non inscrit";
   }
 
   if (
@@ -213,23 +212,23 @@ function statusClasses(
   if (
     status === "active"
   ) {
-    return "bg-[#eaf2e6] text-[#4e6545]";
+    return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/10";
   }
 
   if (
     status ===
     "not_registered"
   ) {
-    return "bg-[#efede7] text-[#706c63]";
+    return "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-500/10";
   }
 
   if (
     status === "pending"
   ) {
-    return "bg-[#fff3d8] text-[#a25c0a]";
+    return "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/10";
   }
 
-  return "bg-red-50 text-red-700";
+  return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/10";
 }
 
 async function responseError(
@@ -748,6 +747,12 @@ export function MemberDirectory() {
       setForm(emptyForm);
 
       await loadMembers();
+
+      showToast(
+        editing
+          ? "Membre modifié"
+          : "Membre ajouté",
+      );
     } catch (cause) {
       setFormError(
         cause instanceof Error
@@ -814,11 +819,21 @@ export function MemberDirectory() {
       }
 
       await loadMembers();
+
+      showToast(
+        action === "approve"
+          ? "Accès membre activé"
+          : "Inscription refusée",
+        action === "approve"
+          ? "success"
+          : "warning",
+      );
     } catch (cause) {
-      window.alert(
+      showToast(
         cause instanceof Error
           ? cause.message
           : "Impossible d'effectuer cette action.",
+        "error",
       );
     } finally {
       setAccountAction(null);
@@ -877,11 +892,16 @@ export function MemberDirectory() {
       }
 
       await loadMembers();
+
+      showToast(
+        "Rôle modifié",
+      );
     } catch (cause) {
-      window.alert(
+      showToast(
         cause instanceof Error
           ? cause.message
           : "Impossible de modifier le rôle.",
+        "error",
       );
     } finally {
       setAccountAction(null);
@@ -942,42 +962,54 @@ export function MemberDirectory() {
       setSelected(null);
 
       await loadMembers();
+
+      showToast(
+        "Membre retiré",
+      );
     } catch (cause) {
-      window.alert(
+      showToast(
         cause instanceof Error
           ? cause.message
           : "Impossible de retirer ce membre.",
+        "error",
       );
     } finally {
       setAccountAction(null);
     }
   }
 
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("all");
+    setRoleFilter("all");
+  }
+
   return (
     <>
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-3xl font-black tracking-[-0.03em] text-[#292923] sm:text-4xl">
-              Membres
-            </h1>
-
-            <p className="mt-2 text-sm text-[#77746c] sm:text-base">
-              Annuaire et gestion des membres de la chorale.
-            </p>
-          </div>
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-slate-500">
+            <span className="font-semibold text-slate-900">
+              {members.length}
+            </span>{" "}
+            membre
+            {members.length !==
+            1
+              ? "s"
+              : ""}
+          </p>
 
           {canManage && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() =>
                   setImportOpen(true)
                 }
-                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#dcd8cf] bg-white px-4 text-sm font-bold text-[#626a5d] transition hover:bg-[#f7f8f5]"
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
               >
                 <FileUp
-                  size={17}
+                  size={16}
                 />
                 Importer
               </button>
@@ -985,388 +1017,423 @@ export function MemberDirectory() {
               <button
                 type="button"
                 onClick={openCreate}
-                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#687a5e] px-5 text-sm font-bold text-white transition hover:bg-[#58694f]"
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
               >
-                <Plus size={17} />
+                <Plus size={16} />
                 Ajouter
               </button>
             </div>
           )}
         </div>
 
-        {canManage && (
-          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-            <button
-              type="button"
-              onClick={() =>
-                setStatusFilter(
-                  statusFilter ===
-                    "active"
-                    ? "all"
-                    : "active",
-                )
-              }
-              className={`rounded-2xl border bg-white p-5 text-left transition ${
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+          <button
+            type="button"
+            onClick={() =>
+              setStatusFilter(
                 statusFilter ===
-                "active"
-                  ? "border-[#8da081] ring-2 ring-[#687a5e]/10"
-                  : "border-[#e4e0d7] hover:border-[#cbd4c6]"
-              }`}
-            >
+                  "active"
+                  ? "all"
+                  : "active",
+              )
+            }
+            className={[
+              "flex items-center gap-3 rounded-xl border bg-white p-3.5 text-left transition",
+              statusFilter ===
+              "active"
+                ? "border-emerald-300 ring-2 ring-emerald-100"
+                : "border-slate-200 hover:border-slate-300",
+            ].join(" ")}
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
               <UserCheck
-                size={20}
-                className="text-[#687a5e]"
+                size={17}
               />
+            </span>
 
-              <p className="mt-4 text-3xl font-black text-[#292923]">
+            <span>
+              <span className="block text-lg font-semibold leading-none text-slate-950">
                 {counts.active}
-              </p>
+              </span>
 
-              <p className="mt-1 text-sm font-bold text-[#77746c]">
+              <span className="mt-1 block text-xs text-slate-500">
                 Actifs
-              </p>
-            </button>
+              </span>
+            </span>
+          </button>
 
-            <button
-              type="button"
-              onClick={() =>
-                setStatusFilter(
-                  statusFilter ===
-                    "not_registered"
-                    ? "all"
-                    : "not_registered",
-                )
-              }
-              className={`rounded-2xl border bg-white p-5 text-left transition ${
+          <button
+            type="button"
+            onClick={() =>
+              setStatusFilter(
                 statusFilter ===
-                "not_registered"
-                  ? "border-[#aaa69c] ring-2 ring-black/5"
-                  : "border-[#e4e0d7] hover:border-[#d1cdc4]"
-              }`}
-            >
+                  "not_registered"
+                  ? "all"
+                  : "not_registered",
+              )
+            }
+            className={[
+              "flex items-center gap-3 rounded-xl border bg-white p-3.5 text-left transition",
+              statusFilter ===
+              "not_registered"
+                ? "border-slate-400 ring-2 ring-slate-100"
+                : "border-slate-200 hover:border-slate-300",
+            ].join(" ")}
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
               <Clock3
-                size={20}
-                className="text-[#77736b]"
+                size={17}
               />
+            </span>
 
-              <p className="mt-4 text-3xl font-black text-[#292923]">
+            <span>
+              <span className="block text-lg font-semibold leading-none text-slate-950">
                 {
                   counts.not_registered
                 }
-              </p>
+              </span>
 
-              <p className="mt-1 text-sm font-bold text-[#77746c]">
+              <span className="mt-1 block text-xs text-slate-500">
                 Non inscrits
-              </p>
-            </button>
+              </span>
+            </span>
+          </button>
 
-            <button
-              type="button"
-              onClick={() =>
-                setStatusFilter(
-                  statusFilter ===
-                    "pending"
-                    ? "all"
-                    : "pending",
-                )
-              }
-              className={`rounded-2xl border bg-white p-5 text-left transition ${
+          <button
+            type="button"
+            onClick={() =>
+              setStatusFilter(
                 statusFilter ===
-                "pending"
-                  ? "border-amber-300 ring-2 ring-amber-100"
-                  : "border-[#e4e0d7] hover:border-amber-200"
-              }`}
-            >
+                  "pending"
+                  ? "all"
+                  : "pending",
+              )
+            }
+            className={[
+              "flex items-center gap-3 rounded-xl border bg-white p-3.5 text-left transition",
+              statusFilter ===
+              "pending"
+                ? "border-amber-300 ring-2 ring-amber-100"
+                : "border-slate-200 hover:border-slate-300",
+            ].join(" ")}
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
               <UsersRound
-                size={20}
-                className="text-amber-700"
+                size={17}
               />
+            </span>
 
-              <p className="mt-4 text-3xl font-black text-[#292923]">
+            <span>
+              <span className="block text-lg font-semibold leading-none text-slate-950">
                 {counts.pending}
-              </p>
+              </span>
 
-              <p className="mt-1 text-sm font-bold text-[#77746c]">
+              <span className="mt-1 block text-xs text-slate-500">
                 À valider
-              </p>
-            </button>
+              </span>
+            </span>
+          </button>
 
-            <button
-              type="button"
-              onClick={() =>
-                setStatusFilter(
-                  statusFilter ===
-                    "rejected"
-                    ? "all"
-                    : "rejected",
-                )
-              }
-              className={`rounded-2xl border bg-white p-5 text-left transition ${
+          <button
+            type="button"
+            onClick={() =>
+              setStatusFilter(
                 statusFilter ===
-                "rejected"
-                  ? "border-red-300 ring-2 ring-red-100"
-                  : "border-[#e4e0d7] hover:border-red-200"
-              }`}
-            >
+                  "rejected"
+                  ? "all"
+                  : "rejected",
+              )
+            }
+            className={[
+              "flex items-center gap-3 rounded-xl border bg-white p-3.5 text-left transition",
+              statusFilter ===
+              "rejected"
+                ? "border-red-300 ring-2 ring-red-100"
+                : "border-slate-200 hover:border-slate-300",
+            ].join(" ")}
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-600">
               <UserX
-                size={20}
-                className="text-red-600"
+                size={17}
               />
+            </span>
 
-              <p className="mt-4 text-3xl font-black text-[#292923]">
+            <span>
+              <span className="block text-lg font-semibold leading-none text-slate-950">
                 {counts.rejected}
-              </p>
+              </span>
 
-              <p className="mt-1 text-sm font-bold text-[#77746c]">
+              <span className="mt-1 block text-xs text-slate-500">
                 Refusés
-              </p>
-            </button>
-          </div>
-        )}
+              </span>
+            </span>
+          </button>
+        </div>
 
-        <section className="overflow-visible rounded-2xl border border-[#e5e1d8] bg-white">
-          <div className="flex flex-col gap-3 border-b border-[#ebe7de] p-4 lg:flex-row lg:items-end lg:p-5">
+        <section className="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-slate-200 p-4 lg:flex-row lg:items-center">
             <div className="relative min-w-0 flex-1">
               <Search
-                size={18}
-                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#88847c]"
+                size={16}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
               />
 
               <input
                 type="search"
                 value={search}
-                onChange={(event) =>
+                onChange={(
+                  event,
+                ) =>
                   setSearch(
                     event.target.value,
                   )
                 }
-                placeholder="Rechercher un membre (nom, email...)"
-                className="min-h-12 w-full rounded-xl border border-[#ddd9d0] bg-[#faf9f6] py-2.5 pl-11 pr-4 text-base outline-none transition focus:border-[#687a5e] focus:bg-white focus:ring-4 focus:ring-[#687a5e]/10"
+                placeholder="Rechercher par nom, email ou téléphone…"
+                className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
               />
             </div>
 
-            {canManage && (
-              <>
-                <label className="min-w-44">
-                  <span className="mb-1.5 block text-xs font-bold text-[#77746c]">
-                    Statut
-                  </span>
+            <select
+              value={
+                statusFilter
+              }
+              onChange={(
+                event,
+              ) =>
+                setStatusFilter(
+                  event.target
+                    .value as StatusFilter,
+                )
+              }
+              className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500"
+            >
+              <option value="all">
+                Tous les statuts
+              </option>
+              <option value="active">
+                Actifs
+              </option>
+              <option value="not_registered">
+                Non inscrits
+              </option>
+              <option value="pending">
+                À valider
+              </option>
+              <option value="rejected">
+                Refusés
+              </option>
+            </select>
 
-                  <select
-                    value={
-                      statusFilter
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      setStatusFilter(
-                        event
-                          .target
-                          .value as StatusFilter,
-                      )
-                    }
-                    className="min-h-12 w-full rounded-xl border border-[#ddd9d0] bg-white px-3 text-sm font-semibold outline-none focus:border-[#687a5e]"
-                  >
-                    <option value="all">
-                      Tous les statuts
-                    </option>
-                    <option value="active">
-                      Actifs
-                    </option>
-                    <option value="not_registered">
-                      Pas encore inscrits
-                    </option>
-                    <option value="pending">
-                      À valider
-                    </option>
-                    <option value="rejected">
-                      Refusés
-                    </option>
-                  </select>
-                </label>
-
-                <label className="min-w-44">
-                  <span className="mb-1.5 block text-xs font-bold text-[#77746c]">
-                    Rôle
-                  </span>
-
-                  <select
-                    value={roleFilter}
-                    onChange={(
-                      event,
-                    ) =>
-                      setRoleFilter(
-                        event
-                          .target
-                          .value as RoleFilter,
-                      )
-                    }
-                    className="min-h-12 w-full rounded-xl border border-[#ddd9d0] bg-white px-3 text-sm font-semibold outline-none focus:border-[#687a5e]"
-                  >
-                    <option value="all">
-                      Tous les rôles
-                    </option>
-                    <option value="member">
-                      Membres
-                    </option>
-                    <option value="admin">
-                      Administrateurs
-                    </option>
-                    <option value="super_admin">
-                      Super administrateurs
-                    </option>
-                  </select>
-                </label>
-              </>
-            )}
+            <select
+              value={
+                roleFilter
+              }
+              onChange={(
+                event,
+              ) =>
+                setRoleFilter(
+                  event.target
+                    .value as RoleFilter,
+                )
+              }
+              className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500"
+            >
+              <option value="all">
+                Tous les rôles
+              </option>
+              <option value="member">
+                Membres
+              </option>
+              <option value="admin">
+                Administrateurs
+              </option>
+              <option value="super_admin">
+                Super administrateurs
+              </option>
+            </select>
           </div>
 
           {!loading &&
             !error && (
-              <div className="flex items-center justify-between border-b border-[#eeeae2] px-4 py-3 sm:px-5">
-                <p className="text-sm font-bold text-[#37372f]">
+              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5 sm:px-5">
+                <p className="text-xs text-slate-500">
                   {
                     filteredMembers.length
                   }{" "}
-                  membre
+                  résultat
                   {filteredMembers.length !==
                   1
                     ? "s"
                     : ""}
                 </p>
 
-                {canManage &&
-                  (
-                    statusFilter !==
-                      "all" ||
-                    roleFilter !==
-                      "all" ||
-                    search
-                  ) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSearch("");
-                        setStatusFilter(
-                          "all",
-                        );
-                        setRoleFilter(
-                          "all",
-                        );
-                      }}
-                      className="text-xs font-bold text-[#687a5e] hover:underline"
-                    >
-                      Réinitialiser
-                    </button>
-                  )}
+                {(
+                  statusFilter !==
+                    "all" ||
+                  roleFilter !==
+                    "all" ||
+                  search
+                ) && (
+                  <button
+                    type="button"
+                    onClick={
+                      clearFilters
+                    }
+                    className="text-xs font-semibold text-blue-600 transition hover:text-blue-700"
+                  >
+                    Réinitialiser
+                  </button>
+                )}
               </div>
             )}
 
           {loading ? (
-            <div className="px-5 py-16 text-center text-sm text-[#77746c]">
-              Chargement des membres…
+            <div className="py-16 text-center text-sm text-slate-500">
+              Chargement…
             </div>
           ) : error ? (
-            <div className="m-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+            <div className="m-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {error}
             </div>
           ) : filteredMembers.length ===
             0 ? (
-            <div className="px-5 py-16 text-center">
+            <div className="py-16 text-center">
               <UserRound
-                size={30}
-                className="mx-auto text-[#aaa69d]"
+                size={28}
+                className="mx-auto text-slate-300"
               />
 
-              <p className="mt-3 font-bold">
+              <p className="mt-3 text-sm font-medium text-slate-600">
                 Aucun membre trouvé
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-[#eeeae2]">
-              {paginatedMembers.map(
-                (member) => {
-                  const status =
-                    statusOf(
-                      member,
-                    );
+            <>
+              <div className="hidden grid-cols-[minmax(260px,1.5fr)_minmax(190px,1fr)_150px_125px_85px_48px] border-b border-slate-200 bg-slate-50 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 lg:grid">
+                <span>
+                  Membre
+                </span>
+                <span>
+                  Contact
+                </span>
+                <span>
+                  Rôle
+                </span>
+                <span>
+                  Statut
+                </span>
+                <span>
+                  Compte
+                </span>
+                <span />
+              </div>
 
-                  const rowKey =
-                    member.membershipId ??
-                    member.userId ??
-                    member.email;
+              <div className="divide-y divide-slate-100">
+                {paginatedMembers.map(
+                  (member) => {
+                    const status =
+                      statusOf(
+                        member,
+                      );
 
-                  const pendingAction =
-                    Boolean(
-                      member.userId &&
-                      (
-                        status ===
-                          "pending" ||
-                        status ===
-                          "rejected"
-                      ) &&
-                      member.role ===
-                        "member",
-                    );
+                    const rowKey =
+                      member.membershipId ??
+                      member.userId ??
+                      member.email;
 
-                  const editable =
-                    canEditTarget(
-                      member,
-                    );
+                    const pendingAction =
+                      Boolean(
+                        member.userId &&
+                        (
+                          status ===
+                            "pending" ||
+                          status ===
+                            "rejected"
+                        ) &&
+                        member.role ===
+                          "member",
+                      );
 
-                  const removable =
-                    canRemoveTarget(
-                      member,
-                    );
+                    const editable =
+                      canEditTarget(
+                        member,
+                      );
 
-                  const hasMenu =
-                    canManage &&
-                    (
+                    const removable =
+                      canRemoveTarget(
+                        member,
+                      );
+
+                    const hasMenu =
                       pendingAction ||
                       editable ||
-                      removable
-                    );
+                      removable;
 
-                  return (
-                    <div
-                      key={rowKey}
-                      className="relative flex items-center gap-3 px-4 py-4 transition hover:bg-[#fafbf9] sm:px-5"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelected(
-                            member,
-                          );
-                          setMenuMemberId(
-                            null,
-                          );
-                        }}
-                        className="flex min-w-0 flex-1 items-center gap-4 text-left"
+                    return (
+                      <div
+                        key={
+                          rowKey
+                        }
+                        className="relative px-4 py-3 transition hover:bg-slate-50 sm:px-5 lg:grid lg:grid-cols-[minmax(260px,1.5fr)_minmax(190px,1fr)_150px_125px_85px_48px] lg:items-center lg:gap-0 lg:py-3"
                       >
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#eaf0e6] text-sm font-black text-[#56674f]">
-                          {initials(
-                            member,
-                          )}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelected(
+                              member,
+                            );
 
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-base font-black text-[#292923]">
-                            {fullName(
+                            setMenuMemberId(
+                              null,
+                            );
+                          }}
+                          className="flex min-w-0 items-center gap-3 text-left lg:pr-4"
+                        >
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
+                            {initials(
                               member,
                             )}
-                          </p>
+                          </div>
 
-                          <p className="mt-0.5 truncate text-sm text-[#77746c]">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-slate-950">
+                              {fullName(
+                                member,
+                              )}
+                            </p>
+
+                            <p className="mt-0.5 truncate text-xs text-slate-400 lg:hidden">
+                              {
+                                member.email
+                              }
+                            </p>
+                          </div>
+                        </button>
+
+                        <div className="hidden min-w-0 pr-4 lg:block">
+                          <p className="truncate text-sm text-slate-700">
                             {
                               member.email
                             }
                           </p>
+
+                          <p className="mt-0.5 truncate text-xs text-slate-400">
+                            {member.phone ??
+                              "—"}
+                          </p>
                         </div>
 
-                        {canManage && (
+                        <div className="mt-3 flex items-center gap-2 lg:mt-0">
+                          <span className="text-xs font-medium text-slate-600">
+                            {roleLabel(
+                              member.role,
+                            )}
+                          </span>
+                        </div>
+
+                        <div className="mt-2 lg:mt-0">
                           <span
-                            className={`hidden shrink-0 rounded-full px-3 py-1.5 text-xs font-bold sm:inline-flex ${statusClasses(
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClasses(
                               status,
                             )}`}
                           >
@@ -1374,79 +1441,71 @@ export function MemberDirectory() {
                               status,
                             )}
                           </span>
-                        )}
-
-                        <div className="hidden w-44 shrink-0 lg:block">
-                          <p className="text-sm font-bold text-[#3a3a33]">
-                            {roleLabel(
-                              member.role,
-                            )}
-                          </p>
-
-                          <p className="mt-0.5 text-xs text-[#89857d]">
-                            {member.userId
-                              ? "Compte créé"
-                              : "Sans compte"}
-                          </p>
                         </div>
-                      </button>
 
-                      {hasMenu && (
-                        <div className="relative">
-                          <button
-                            type="button"
-                            aria-label="Actions"
-                            onClick={() =>
-                              setMenuMemberId(
-                                (
-                                  current,
-                                ) =>
-                                  current ===
-                                  rowKey
-                                    ? null
-                                    : rowKey,
-                              )
-                            }
-                            className="flex h-10 w-10 items-center justify-center rounded-xl text-[#716d65] transition hover:bg-[#efede7]"
-                          >
-                            <MoreHorizontal
-                              size={19}
-                            />
-                          </button>
+                        <div className="hidden text-xs text-slate-500 lg:block">
+                          {member.userId
+                            ? "Créé"
+                            : "—"}
+                        </div>
 
-                          {menuMemberId ===
-                            rowKey && (
-                            <div className="absolute right-0 top-11 z-50 min-w-52 rounded-xl border border-[#e0dcd3] bg-white p-1.5 shadow-xl">
-                              {pendingAction && (
-                                <button
-                                  type="button"
-                                  disabled={
-                                    accountAction !==
-                                    null
-                                  }
-                                  onClick={() =>
-                                    void runUserAction(
-                                      member,
-                                      "approve",
-                                    )
-                                  }
-                                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-bold text-[#53684b] hover:bg-[#eef3eb]"
-                                >
-                                  <Check
-                                    size={15}
-                                  />
-                                  {status ===
-                                  "rejected"
-                                    ? "Réintégrer"
-                                    : "Approuver"}
-                                </button>
-                              )}
+                        {hasMenu ? (
+                          <div className="absolute right-3 top-3 lg:static">
+                            <button
+                              type="button"
+                              aria-label="Actions"
+                              onClick={() =>
+                                setMenuMemberId(
+                                  (
+                                    current,
+                                  ) =>
+                                    current ===
+                                    rowKey
+                                      ? null
+                                      : rowKey,
+                                )
+                              }
+                              className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                            >
+                              <MoreHorizontal
+                                size={18}
+                              />
+                            </button>
 
-                              {status ===
-                                "pending" &&
-                                member.userId &&
-                                member.role ===
-                                  "member" && (
+                            {menuMemberId ===
+                              rowKey && (
+                              <div className="absolute right-0 top-10 z-[80] min-w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10">
+                                {pendingAction && (
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      accountAction !==
+                                      null
+                                    }
+                                    onClick={() =>
+                                      void runUserAction(
+                                        member,
+                                        "approve",
+                                      )
+                                    }
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-emerald-700 transition hover:bg-emerald-50"
+                                  >
+                                    <Check
+                                      size={15}
+                                    />
+
+                                    {status ===
+                                    "rejected"
+                                      ? "Réintégrer"
+                                      : "Approuver"}
+                                  </button>
+                                )}
+
+                                {status ===
+                                  "pending" &&
+                                  member.userId &&
+                                  member.role ===
+                                    "member" && (
                                   <button
                                     type="button"
                                     disabled={
@@ -1459,7 +1518,7 @@ export function MemberDirectory() {
                                         "reject",
                                       )
                                     }
-                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-bold text-red-600 hover:bg-red-50"
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50"
                                   >
                                     <UserX
                                       size={15}
@@ -1468,67 +1527,74 @@ export function MemberDirectory() {
                                   </button>
                                 )}
 
-                              {editable && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    openEdit(
-                                      member,
-                                    )
-                                  }
-                                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-bold hover:bg-[#f5f4ef]"
-                                >
-                                  <Pencil
-                                    size={15}
-                                  />
-                                  Modifier
-                                </button>
-                              )}
+                                {editable && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      openEdit(
+                                        member,
+                                      )
+                                    }
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                                  >
+                                    <Pencil
+                                      size={15}
+                                    />
+                                    Modifier
+                                  </button>
+                                )}
 
-                              {removable && (
-                                <button
-                                  type="button"
-                                  disabled={
-                                    accountAction !==
-                                    null
-                                  }
-                                  onClick={() =>
-                                    void removeMember(
-                                      member,
-                                    )
-                                  }
-                                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-bold text-red-600 hover:bg-red-50"
-                                >
-                                  <Trash2
-                                    size={15}
-                                  />
-                                  Retirer
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                },
-              )}
-            </div>
+                                {removable && (
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      accountAction !==
+                                      null
+                                    }
+                                    onClick={() =>
+                                      void removeMember(
+                                        member,
+                                      )
+                                    }
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50"
+                                  >
+                                    <Trash2
+                                      size={15}
+                                    />
+                                    Retirer
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div />
+                        )}
+                      </div>
+                    );
+                  },
+                )}
+              </div>
+            </>
           )}
 
           {!loading &&
             !error &&
-            filteredMembers.length > 0 &&
+            filteredMembers.length >
+              0 &&
             totalPages > 1 && (
-              <div className="flex flex-col gap-3 border-t border-[#eeeae2] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-                <p className="text-sm text-[#77746c]">
-                  Page {currentPage} sur {totalPages}
+              <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 sm:px-5">
+                <p className="text-xs text-slate-500">
+                  Page {currentPage} sur{" "}
+                  {totalPages}
                 </p>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    disabled={currentPage === 1}
+                    disabled={
+                      currentPage === 1
+                    }
                     onClick={() =>
                       setCurrentPage(
                         (page) =>
@@ -1538,76 +1604,80 @@ export function MemberDirectory() {
                           ),
                       )
                     }
-                    className="min-h-10 rounded-xl border border-[#ddd9d0] bg-white px-4 text-sm font-bold text-[#5f5c55] transition hover:bg-[#f7f6f2] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-30"
+                    aria-label="Page précédente"
                   >
-                    Précédent
+                    <ChevronLeft
+                      size={16}
+                    />
                   </button>
 
-                  <div className="hidden items-center gap-1 sm:flex">
-                    {Array.from(
-                      {
-                        length:
-                          totalPages,
-                      },
-                      (_, index) =>
-                        index + 1,
+                  {Array.from(
+                    {
+                      length:
+                        totalPages,
+                    },
+                    (_, index) =>
+                      index + 1,
+                  )
+                    .filter(
+                      (page) =>
+                        page === 1 ||
+                        page ===
+                          totalPages ||
+                        Math.abs(
+                          page -
+                            currentPage,
+                        ) <= 1,
                     )
-                      .filter(
-                        (page) =>
-                          page === 1 ||
-                          page ===
-                            totalPages ||
-                          Math.abs(
-                            page -
-                              currentPage,
-                          ) <= 1,
-                      )
-                      .map(
-                        (
-                          page,
-                          index,
-                          pages,
-                        ) => {
-                          const previous =
-                            pages[
-                              index - 1
-                            ];
+                    .map(
+                      (
+                        page,
+                        index,
+                        pages,
+                      ) => {
+                        const previous =
+                          pages[
+                            index - 1
+                          ];
 
-                          return (
-                            <div
-                              key={page}
-                              className="flex items-center gap-1"
+                        return (
+                          <div
+                            key={page}
+                            className="flex items-center gap-1.5"
+                          >
+                            {previous &&
+                              page -
+                                previous >
+                                1 && (
+                                <span className="px-1 text-sm text-slate-400">
+                                  …
+                                </span>
+                              )}
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setCurrentPage(
+                                  page,
+                                )
+                              }
+                              className={[
+                                "flex h-9 min-w-9 items-center justify-center rounded-lg px-2.5 text-xs font-semibold transition",
+                                page ===
+                                currentPage
+                                  ? "bg-slate-900 text-white"
+                                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                              ].join(
+                                " ",
+                              )}
                             >
-                              {previous &&
-                                page -
-                                  previous >
-                                  1 && (
-                                  <span className="px-1 text-[#aaa69d]">
-                                    …
-                                  </span>
-                                )}
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setCurrentPage(
-                                    page,
-                                  )
-                                }
-                                className={`flex h-10 min-w-10 items-center justify-center rounded-xl px-3 text-sm font-bold transition ${
-                                  page ===
-                                  currentPage
-                                    ? "bg-[#687a5e] text-white"
-                                    : "border border-[#ddd9d0] bg-white text-[#5f5c55] hover:bg-[#f7f6f2]"
-                                }`}
-                              >
-                                {page}
-                              </button>
-                            </div>
-                          );
-                        },
-                      )}
-                  </div>
+                              {page}
+                            </button>
+                          </div>
+                        );
+                      },
+                    )}
 
                   <button
                     type="button"
@@ -1624,9 +1694,12 @@ export function MemberDirectory() {
                           ),
                       )
                     }
-                    className="min-h-10 rounded-xl border border-[#ddd9d0] bg-white px-4 text-sm font-bold text-[#5f5c55] transition hover:bg-[#f7f6f2] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-30"
+                    aria-label="Page suivante"
                   >
-                    Suivant
+                    <ChevronRight
+                      size={16}
+                    />
                   </button>
                 </div>
               </div>
@@ -1635,7 +1708,7 @@ export function MemberDirectory() {
       </div>
 
       {selected && (
-        <div className="fixed inset-0 z-[280] flex justify-end bg-black/30 backdrop-blur-[1px]">
+        <div className="fixed inset-0 z-[280] flex justify-end bg-slate-950/25 backdrop-blur-[1px]">
           <button
             type="button"
             aria-label="Fermer"
@@ -1645,160 +1718,169 @@ export function MemberDirectory() {
             className="absolute inset-0"
           />
 
-          <aside className="relative z-10 flex h-full w-full max-w-[460px] flex-col border-l border-[#e3dfd6] bg-[#faf9f6] shadow-2xl">
-            <header className="flex shrink-0 items-center justify-end border-b border-[#e9e5dc] bg-white px-5 py-3">
+          <aside className="relative z-10 flex h-full w-full max-w-[460px] flex-col border-l border-slate-200 bg-slate-50 shadow-2xl">
+            <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-5">
+              <p className="text-sm font-semibold text-slate-900">
+                Détails du membre
+              </p>
+
               <button
                 type="button"
-                aria-label="Fermer"
                 onClick={() =>
                   setSelected(null)
                 }
-                className="flex h-10 w-10 items-center justify-center rounded-full transition hover:bg-[#f3f1eb]"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Fermer"
               >
-                <X size={19} />
+                <X size={17} />
               </button>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
-              <div className="flex items-center gap-4">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#dfe8da] text-xl font-black text-[#53654c]">
-                  {initials(
-                    selected,
-                  )}
-                </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-900 text-base font-semibold text-white">
+                    {initials(
+                      selected,
+                    )}
+                  </div>
 
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="truncate text-2xl font-black text-[#292923]">
+                  <div className="min-w-0 flex-1">
+                    <h2 className="truncate text-lg font-semibold text-slate-950">
                       {fullName(
                         selected,
                       )}
                     </h2>
 
-                    {canManage && (
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-bold ${statusClasses(
-                          statusOf(
-                            selected,
-                          ),
-                        )}`}
-                      >
-                        {statusLabel(
-                          statusOf(
-                            selected,
-                          ),
-                        )}
-                      </span>
-                    )}
+                    <p className="mt-0.5 text-sm text-slate-500">
+                      {roleLabel(
+                        selected.role,
+                      )}
+                    </p>
                   </div>
 
-                  <p className="mt-1 text-sm text-[#7b776f]">
-                    {roleLabel(
-                      selected.role,
+                  <span
+                    className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${statusClasses(
+                      statusOf(
+                        selected,
+                      ),
+                    )}`}
+                  >
+                    {statusLabel(
+                      statusOf(
+                        selected,
+                      ),
                     )}
-                  </p>
+                  </span>
                 </div>
               </div>
 
-              <section className="mt-7 rounded-2xl border border-[#e5e1d8] bg-white p-5">
-                <h3 className="font-black text-[#31312b]">
-                  Coordonnées
-                </h3>
+              <section className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <div className="border-b border-slate-100 px-4 py-3">
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Coordonnées
+                  </h3>
+                </div>
 
-                <a
-                  href={`mailto:${selected.email}`}
-                  className="mt-4 flex items-center gap-3 text-sm font-semibold text-[#55544e] hover:text-[#687a5e]"
-                >
-                  <Mail
-                    size={17}
-                    className="shrink-0"
-                  />
-                  <span className="break-all">
-                    {
-                      selected.email
-                    }
-                  </span>
-                </a>
-
-                <div className="mt-3 flex items-center gap-3 text-sm text-[#55544e]">
-                  <Phone
-                    size={17}
-                    className="shrink-0"
-                  />
-
-                  {selected.phone ? (
-                    <a
-                      href={`tel:${selected.phone}`}
-                      className="font-semibold hover:text-[#687a5e]"
-                    >
-                      {
-                        selected.phone
-                      }
-                    </a>
-                  ) : (
-                    <span className="text-[#99958c]">
-                      Non renseigné
+                <div className="space-y-4 p-4">
+                  <a
+                    href={`mailto:${selected.email}`}
+                    className="flex items-center gap-3 text-sm text-slate-700 transition hover:text-blue-600"
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                      <Mail
+                        size={15}
+                      />
                     </span>
-                  )}
+
+                    <span className="min-w-0 break-all">
+                      {
+                        selected.email
+                      }
+                    </span>
+                  </a>
+
+                  <div className="flex items-center gap-3 text-sm text-slate-700">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                      <Phone
+                        size={15}
+                      />
+                    </span>
+
+                    {selected.phone ? (
+                      <a
+                        href={`tel:${selected.phone}`}
+                        className="transition hover:text-blue-600"
+                      >
+                        {
+                          selected.phone
+                        }
+                      </a>
+                    ) : (
+                      <span className="text-slate-400">
+                        Non renseigné
+                      </span>
+                    )}
+                  </div>
                 </div>
               </section>
 
-              {canManage && (
-                <section className="mt-4 rounded-2xl border border-[#e5e1d8] bg-white p-5">
-                  <h3 className="font-black text-[#31312b]">
-                    Adhésion et accès
+              <section className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <div className="border-b border-slate-100 px-4 py-3">
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Accès
                   </h3>
+                </div>
 
-                  <div className="mt-4 space-y-3 text-sm">
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-[#77746c]">
-                        Liste officielle
-                      </span>
+                <div className="divide-y divide-slate-100">
+                  <div className="flex items-center justify-between px-4 py-3 text-sm">
+                    <span className="text-slate-500">
+                      Liste officielle
+                    </span>
 
-                      <span className="font-bold text-[#34342e]">
-                        {selected.isOfficial
-                          ? "Oui"
-                          : "Non"}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-[#77746c]">
-                        Compte
-                      </span>
-
-                      <span className="font-bold text-[#34342e]">
-                        {selected.userId
-                          ? "Créé"
-                          : "Pas encore créé"}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-[#77746c]">
-                        Statut
-                      </span>
-
-                      <span className="font-bold text-[#34342e]">
-                        {statusLabel(
-                          statusOf(
-                            selected,
-                          ),
-                        )}
-                      </span>
-                    </div>
+                    <span className="font-medium text-slate-900">
+                      {selected.isOfficial
+                        ? "Oui"
+                        : "Non"}
+                    </span>
                   </div>
-                </section>
-              )}
 
-              <section className="mt-4 rounded-2xl border border-[#e5e1d8] bg-white p-5">
+                  <div className="flex items-center justify-between px-4 py-3 text-sm">
+                    <span className="text-slate-500">
+                      Compte
+                    </span>
+
+                    <span className="font-medium text-slate-900">
+                      {selected.userId
+                        ? "Créé"
+                        : "Non créé"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between px-4 py-3 text-sm">
+                    <span className="text-slate-500">
+                      Statut
+                    </span>
+
+                    <span className="font-medium text-slate-900">
+                      {statusLabel(
+                        statusOf(
+                          selected,
+                        ),
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </section>
+
+              <section className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
                 <div className="flex items-center gap-2">
                   <ShieldCheck
-                    size={18}
-                    className="text-[#687a5e]"
+                    size={16}
+                    className="text-slate-500"
                   />
 
-                  <h3 className="font-black text-[#31312b]">
+                  <h3 className="text-sm font-semibold text-slate-900">
                     Rôle
                   </h3>
                 </div>
@@ -1825,7 +1907,7 @@ export function MemberDirectory() {
                           .value as Role,
                       )
                     }
-                    className="mt-4 min-h-11 w-full rounded-xl border border-[#ddd9d0] bg-white px-3 text-sm font-bold outline-none focus:border-[#687a5e]"
+                    className="mt-3 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-blue-500"
                   >
                     <option value="member">
                       Membre
@@ -1838,93 +1920,30 @@ export function MemberDirectory() {
                     </option>
                   </select>
                 ) : (
-                  <div className="mt-4 rounded-xl bg-[#f5f4ef] px-4 py-3 text-sm font-bold text-[#525149]">
+                  <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-700">
                     {roleLabel(
                       selected.role,
                     )}
                   </div>
                 )}
-
-                {!selected.userId && (
-                  <p className="mt-2 text-xs leading-5 text-[#8a867d]">
-                    Le rôle du compte pourra être modifié après l&apos;inscription.
-                  </p>
-                )}
-
-                {selected.userId ===
-                  currentUserId &&
-                  canManageRoles && (
-                    <p className="mt-2 text-xs leading-5 text-[#8a867d]">
-                      Votre propre rôle ne peut pas être modifié depuis cette page.
-                    </p>
-                  )}
               </section>
             </div>
 
-            {canManage && (
-              <footer className="shrink-0 border-t border-[#e5e1d8] bg-white p-4 sm:p-5">
-                <div className="flex flex-wrap justify-end gap-2">
-                  {(
-                    statusOf(
-                      selected,
-                    ) ===
-                      "pending" ||
-                    statusOf(
-                      selected,
-                    ) ===
-                      "rejected"
-                  ) &&
-                    selected.userId &&
-                    selected.role ===
-                      "member" && (
-                      <button
-                        type="button"
-                        disabled={
-                          accountAction !==
-                          null
-                        }
-                        onClick={() =>
-                          void runUserAction(
-                            selected,
-                            "approve",
-                          )
-                        }
-                        className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#687a5e] px-4 text-sm font-bold text-white disabled:opacity-50"
-                      >
-                        <Check
-                          size={16}
-                        />
-                        {statusOf(
-                          selected,
-                        ) ===
-                        "rejected"
-                          ? "Réintégrer"
-                          : "Approuver"}
-                      </button>
-                    )}
-
-                  {canEditTarget(
+            <footer className="shrink-0 border-t border-slate-200 bg-white p-4">
+              <div className="flex flex-wrap justify-end gap-2">
+                {(
+                  statusOf(
                     selected,
-                  ) && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        openEdit(
-                          selected,
-                        )
-                      }
-                      className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#dcd8cf] px-4 text-sm font-bold"
-                    >
-                      <Pencil
-                        size={16}
-                      />
-                      Modifier
-                    </button>
-                  )}
-
-                  {canRemoveTarget(
+                  ) ===
+                    "pending" ||
+                  statusOf(
                     selected,
-                  ) && (
+                  ) ===
+                    "rejected"
+                ) &&
+                  selected.userId &&
+                  selected.role ===
+                    "member" && (
                     <button
                       type="button"
                       disabled={
@@ -1932,27 +1951,75 @@ export function MemberDirectory() {
                         null
                       }
                       onClick={() =>
-                        void removeMember(
+                        void runUserAction(
                           selected,
+                          "approve",
                         )
                       }
-                      className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-red-200 px-4 text-sm font-bold text-red-600 disabled:opacity-50"
+                      className="inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
                     >
-                      <Trash2
-                        size={16}
+                      <Check
+                        size={15}
                       />
-                      Retirer
+
+                      {statusOf(
+                        selected,
+                      ) ===
+                      "rejected"
+                        ? "Réintégrer"
+                        : "Approuver"}
                     </button>
                   )}
-                </div>
-              </footer>
-            )}
+
+                {canEditTarget(
+                  selected,
+                ) && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openEdit(
+                        selected,
+                      )
+                    }
+                    className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <Pencil
+                      size={15}
+                    />
+                    Modifier
+                  </button>
+                )}
+
+                {canRemoveTarget(
+                  selected,
+                ) && (
+                  <button
+                    type="button"
+                    disabled={
+                      accountAction !==
+                      null
+                    }
+                    onClick={() =>
+                      void removeMember(
+                        selected,
+                      )
+                    }
+                    className="inline-flex h-10 items-center gap-2 rounded-lg border border-red-200 bg-white px-4 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                  >
+                    <Trash2
+                      size={15}
+                    />
+                    Retirer
+                  </button>
+                )}
+              </div>
+            </footer>
           </aside>
         </div>
       )}
 
       {formOpen && (
-        <div className="fixed inset-0 z-[320] flex items-end justify-center bg-black/40 backdrop-blur-[2px] sm:items-center sm:p-6">
+        <div className="fixed inset-0 z-[320] flex items-end justify-center bg-slate-950/30 backdrop-blur-[2px] sm:items-center sm:p-6">
           <button
             type="button"
             aria-label="Fermer"
@@ -1963,19 +2030,13 @@ export function MemberDirectory() {
             className="absolute inset-0"
           />
 
-          <div className="relative z-10 w-full overflow-hidden rounded-t-[24px] border border-[#e5e1d7] bg-[#faf9f6] shadow-2xl sm:max-w-lg sm:rounded-[24px]">
-            <header className="flex items-center justify-between border-b border-[#e9e5dc] bg-white px-5 py-4 sm:px-6">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#817d74]">
-                  Membres
-                </p>
-
-                <h2 className="mt-1 text-xl font-black">
-                  {editingMember
-                    ? "Modifier le membre"
-                    : "Ajouter un membre"}
-                </h2>
-              </div>
+          <div className="relative z-10 w-full overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:max-w-lg sm:rounded-2xl">
+            <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+              <h2 className="text-base font-semibold text-slate-950">
+                {editingMember
+                  ? "Modifier le membre"
+                  : "Ajouter un membre"}
+              </h2>
 
               <button
                 type="button"
@@ -1983,29 +2044,31 @@ export function MemberDirectory() {
                 onClick={() =>
                   setFormOpen(false)
                 }
-                className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-[#f3f1eb]"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Fermer"
               >
-                <X size={18} />
+                <X size={17} />
               </button>
             </header>
 
             <form
               onSubmit={saveMember}
             >
-              <div className="space-y-4 p-5 sm:p-6">
+              <div className="space-y-4 p-5">
                 {formError && (
-                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
                     {formError}
                   </div>
                 )}
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label>
-                    <span className="mb-1.5 block text-sm font-bold">
+                    <span className="mb-1.5 block text-xs font-semibold text-slate-600">
                       Prénom
                     </span>
 
                     <input
+                      autoFocus
                       value={
                         form.firstname
                       }
@@ -2020,12 +2083,12 @@ export function MemberDirectory() {
                               .value,
                         })
                       }
-                      className="min-h-11 w-full rounded-xl border border-[#ddd9cf] bg-white px-4 outline-none focus:border-[#687a5e] focus:ring-4 focus:ring-[#687a5e]/10"
+                      className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                     />
                   </label>
 
                   <label>
-                    <span className="mb-1.5 block text-sm font-bold">
+                    <span className="mb-1.5 block text-xs font-semibold text-slate-600">
                       Nom
                     </span>
 
@@ -2044,13 +2107,13 @@ export function MemberDirectory() {
                               .value,
                         })
                       }
-                      className="min-h-11 w-full rounded-xl border border-[#ddd9cf] bg-white px-4 outline-none focus:border-[#687a5e] focus:ring-4 focus:ring-[#687a5e]/10"
+                      className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                     />
                   </label>
                 </div>
 
-                <label>
-                  <span className="mb-1.5 block text-sm font-bold">
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-semibold text-slate-600">
                     Email
                   </span>
 
@@ -2072,18 +2135,12 @@ export function MemberDirectory() {
                             .value,
                       })
                     }
-                    className="min-h-11 w-full rounded-xl border border-[#ddd9cf] bg-white px-4 outline-none disabled:bg-[#f1efe9] disabled:text-[#77746c] focus:border-[#687a5e] focus:ring-4 focus:ring-[#687a5e]/10"
+                    className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 disabled:bg-slate-50 disabled:text-slate-400"
                   />
-
-                  {editingMember?.userId && (
-                    <span className="mt-1.5 block text-xs text-[#858178]">
-                      L&apos;email ne peut plus être changé après la création du compte.
-                    </span>
-                  )}
                 </label>
 
-                <label>
-                  <span className="mb-1.5 block text-sm font-bold">
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-semibold text-slate-600">
                     Téléphone
                   </span>
 
@@ -2102,12 +2159,12 @@ export function MemberDirectory() {
                       })
                     }
                     placeholder="Facultatif"
-                    className="min-h-11 w-full rounded-xl border border-[#ddd9cf] bg-white px-4 outline-none focus:border-[#687a5e] focus:ring-4 focus:ring-[#687a5e]/10"
+                    className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                   />
                 </label>
               </div>
 
-              <footer className="flex justify-end gap-2 border-t border-[#e9e5dc] bg-white px-5 py-4 sm:px-6">
+              <footer className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
                 <button
                   type="button"
                   disabled={saving}
@@ -2116,7 +2173,7 @@ export function MemberDirectory() {
                       false,
                     )
                   }
-                  className="min-h-11 rounded-xl border border-[#ddd9cf] px-4 text-sm font-bold"
+                  className="h-10 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
                   Annuler
                 </button>
@@ -2124,7 +2181,7 @@ export function MemberDirectory() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="min-h-11 rounded-xl bg-[#687a5e] px-5 text-sm font-bold text-white disabled:opacity-50"
+                  className="h-10 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
                 >
                   {saving
                     ? "Enregistrement…"
@@ -2148,7 +2205,12 @@ export function MemberDirectory() {
         }
         onImported={() => {
           setImportOpen(false);
+
           void loadMembers();
+
+          showToast(
+            "Membres importés",
+          );
         }}
       />
     </>

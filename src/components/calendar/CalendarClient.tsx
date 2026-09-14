@@ -38,6 +38,9 @@ import {
 } from "react";
 
 import { CalendarImportModal } from "@/components/calendar/CalendarImportModal";
+import { NotifyMembersField } from "@/components/notifications/NotifyMembersField";
+import { publishMemberUpdate } from "@/lib/publish-member-update";
+import { showToast } from "@/lib/toast";
 
 type RepeatType =
   | "none"
@@ -247,6 +250,35 @@ async function responseError(
   }
 }
 
+function formatUpcomingEvent(
+  event: DisplayEvent,
+) {
+  const date =
+    new Date(event.start);
+
+  if (event.allDay) {
+    return new Intl.DateTimeFormat(
+      "fr-FR",
+      {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+      },
+    ).format(date);
+  }
+
+  return new Intl.DateTimeFormat(
+    "fr-FR",
+    {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    },
+  ).format(date);
+}
+
 export function CalendarClient({
   canManage,
 }: {
@@ -302,6 +334,11 @@ export function CalendarClient({
   const [
     saving,
     setSaving,
+  ] = useState(false);
+
+  const [
+    notifyMembers,
+    setNotifyMembers,
   ] = useState(false);
 
   const [
@@ -463,6 +500,7 @@ export function CalendarClient({
             {
               signal:
                 controller.signal,
+              cache: "no-store",
             },
           );
 
@@ -621,6 +659,7 @@ export function CalendarClient({
 
     setError("");
     setRepeatError("");
+    setNotifyMembers(false);
   }
 
   function openCreate(
@@ -649,6 +688,7 @@ export function CalendarClient({
 
     setError("");
     setRepeatError("");
+    setNotifyMembers(false);
 
     setModalMode(
       "create",
@@ -745,6 +785,7 @@ export function CalendarClient({
 
     setError("");
     setRepeatError("");
+    setNotifyMembers(false);
 
     setModalMode("view");
     setModalOpen(true);
@@ -1008,8 +1049,27 @@ export function CalendarClient({
         );
       }
 
+      void publishMemberUpdate(
+        "calendar",
+        notifyMembers,
+      );
+
+      const savedDate =
+        form.date;
+
+      const successMessage =
+        modalMode === "create"
+          ? "Événement créé"
+          : "Événement modifié";
+
       closeModal();
+
+      calendarRef.current
+        ?.getApi()
+        .gotoDate(savedDate);
+
       refetchEvents();
+      showToast(successMessage);
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -1097,6 +1157,9 @@ export function CalendarClient({
 
       closeModal();
       refetchEvents();
+      showToast(
+        "Événement supprimé",
+      );
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -1184,6 +1247,16 @@ export function CalendarClient({
             ),
           );
         }
+
+        if (
+          pendingScopeAction.kind ===
+            "save"
+        ) {
+          void publishMemberUpdate(
+            "calendar",
+            notifyMembers,
+          );
+        }
       } else {
         const response =
           await fetch(
@@ -1240,6 +1313,26 @@ export function CalendarClient({
       }
 
       refetchEvents();
+
+      if (
+        completedAction ===
+        "delete"
+      ) {
+        showToast(
+          "Événement supprimé",
+        );
+      } else if (
+        completedAction ===
+        "move"
+      ) {
+        showToast(
+          "Événement déplacé",
+        );
+      } else {
+        showToast(
+          "Événement modifié",
+        );
+      }
     } catch (cause) {
       if (
         pendingScopeAction
@@ -1259,17 +1352,37 @@ export function CalendarClient({
   }
 
   const inputClass =
-    "w-full rounded-xl border border-[#ded9ce] bg-white px-4 py-3 text-[16px] text-[#24241f] outline-none transition focus:border-[#687a5e] focus:ring-4 focus:ring-[#687a5e]/10 sm:text-sm";
+    "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[16px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 sm:text-sm";
 
   const isEditing =
     modalMode === "create" ||
     modalMode === "edit";
 
+  const upcomingEvents =
+    displayEvents
+      .filter(
+        (event) =>
+          new Date(
+            event.start,
+          ).getTime() >=
+          Date.now(),
+      )
+      .sort(
+        (left, right) =>
+          new Date(
+            left.start,
+          ).getTime() -
+          new Date(
+            right.start,
+          ).getTime(),
+      )
+      .slice(0, 6);
+
   return (
     <>
-      <section className="overflow-hidden rounded-2xl border border-[#e7e3da] bg-white">
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         {canManage && (
-          <div className="flex flex-wrap items-center justify-end gap-2 border-b border-[#eeeae1] px-4 py-3 sm:px-5">
+          <div className="flex flex-wrap items-center justify-end gap-2 border-b border-[#e2e8f0] px-4 py-3 sm:px-5">
             <button
               type="button"
               onClick={() =>
@@ -1277,7 +1390,7 @@ export function CalendarClient({
                   true,
                 )
               }
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#dcd8ce] bg-white px-4 text-sm font-bold text-[#535f4e] transition hover:bg-[#f3f6f1]"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
             >
               <FileUp
                 size={16}
@@ -1293,7 +1406,7 @@ export function CalendarClient({
                   new Date(),
                 )
               }
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#687a5e] px-4 text-sm font-bold text-white transition hover:bg-[#56664d]"
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
             >
               <Plus
                 size={16}
@@ -1320,9 +1433,10 @@ export function CalendarClient({
           </div>
         )}
 
-        <div className="relative overflow-x-auto p-3 sm:p-5">
+        <div className="grid xl:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="relative min-w-0 overflow-x-auto p-3 sm:p-4">
           {calendarLoading && (
-            <div className="pointer-events-none absolute right-5 top-5 z-10 rounded-lg border border-[#e3dfd5] bg-white/95 px-3 py-1.5 text-xs font-semibold text-[#6f6b63] shadow-sm">
+            <div className="pointer-events-none absolute right-5 top-5 z-10 rounded-lg border border-[#e2e8f0] bg-white/95 px-3 py-1.5 text-xs font-semibold text-[#64748b] shadow-sm">
               Chargement…
             </div>
           )}
@@ -1343,16 +1457,20 @@ export function CalendarClient({
             }
             initialView="dayGridMonth"
             firstDay={1}
-            height="auto"
+            height={
+              mobile
+                ? "auto"
+                : 560
+            }
             nowIndicator
-            dayMaxEvents={3}
+            dayMaxEvents={2}
             editable={
               canManage
             }
             eventDurationEditable={
               false
             }
-            eventColor="#687a5e"
+            eventColor="#2563eb"
             eventContrastColor="#ffffff"
             eventDisplay="block"
             events={
@@ -1544,16 +1662,105 @@ export function CalendarClient({
                 }
 
                 refetchEvents();
+
+                showToast(
+                  "Événement déplacé",
+                );
+
+                void publishMemberUpdate(
+                  "calendar",
+                  false,
+                );
               } catch {
                 info.revert();
+
+                showToast(
+                  "Impossible de déplacer l'événement.",
+                  "error",
+                );
               }
             }}
           />
+          </div>
+
+          <aside className="border-t border-slate-200 bg-slate-50/60 p-4 xl:border-l xl:border-t-0">
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-slate-900">
+                À venir
+              </h3>
+            </div>
+
+            {upcomingEvents.length ===
+            0 ? (
+              <p className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-5 text-center text-sm text-slate-500">
+                Aucun événement à venir dans cette période.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {upcomingEvents.map(
+                  (event) => (
+                    <button
+                      key={
+                        event.id
+                      }
+                      type="button"
+                      onClick={() =>
+                        calendarRef.current
+                          ?.getApi()
+                          .gotoDate(
+                            event.start,
+                          )
+                      }
+                      className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-slate-300 hover:shadow-sm"
+                    >
+                      <p className="text-sm font-semibold text-slate-900">
+                        {
+                          event.title
+                        }
+                      </p>
+
+                      <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+                        <Clock3
+                          size={
+                            13
+                          }
+                        />
+
+                        {formatUpcomingEvent(
+                          event,
+                        )}
+                      </div>
+
+                      {event
+                        .extendedProps
+                        .location && (
+                        <div className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-500">
+                          <MapPin
+                            size={
+                              13
+                            }
+                          />
+
+                          <span className="truncate">
+                            {
+                              event
+                                .extendedProps
+                                .location
+                            }
+                          </span>
+                        </div>
+                      )}
+                    </button>
+                  ),
+                )}
+              </div>
+            )}
+          </aside>
         </div>
       </section>
 
       {modalOpen && (
-        <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-6">
+        <div className="fixed inset-0 z-[200] flex items-end justify-center bg-slate-950/30 p-0 backdrop-blur-[2px] sm:items-center sm:p-6">
           <button
             type="button"
             aria-label="Fermer"
@@ -1566,21 +1773,11 @@ export function CalendarClient({
           <div
             role="dialog"
             aria-modal="true"
-            className="relative z-10 flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[24px] border border-[#e6e1d6] bg-[#faf9f6] shadow-2xl sm:max-w-xl sm:rounded-[24px]"
+            className="relative z-10 flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-[#e2e8f0] bg-[#f8fafc] shadow-2xl sm:max-w-xl sm:rounded-2xl"
           >
-            <header className="flex shrink-0 items-center justify-between border-b border-[#e9e5dc] bg-white px-5 py-4 sm:px-6">
+            <header className="flex shrink-0 items-center justify-between border-b border-[#e2e8f0] bg-white px-5 py-4 sm:px-6">
               <div className="min-w-0">
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#7b786f]">
-                  {modalMode ===
-                  "create"
-                    ? "Calendrier"
-                    : modalMode ===
-                        "edit"
-                      ? "Modification"
-                      : "Événement"}
-                </p>
-
-                <h2 className="mt-1 truncate text-xl font-black text-[#22221d]">
+                <h2 className="truncate text-lg font-semibold text-slate-950">
                   {modalMode ===
                   "create"
                     ? "Nouvel événement"
@@ -1597,7 +1794,7 @@ export function CalendarClient({
                   closeModal
                 }
                 aria-label="Fermer"
-                className="ml-4 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#625f58] transition hover:bg-[#f1efe9]"
+                className="ml-4 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#64748b] transition hover:bg-[#f1f5f9]"
               >
                 <X
                   size={19}
@@ -1625,7 +1822,7 @@ export function CalendarClient({
                   <div>
                     <label
                       htmlFor="calendar-title"
-                      className="mb-2 block text-sm font-bold text-[#4c4a44]"
+                      className="mb-2 block text-sm font-bold text-[#475569]"
                     >
                       Titre
                     </label>
@@ -1661,7 +1858,7 @@ export function CalendarClient({
                   <div>
                     <label
                       htmlFor="calendar-date"
-                      className="mb-2 block text-sm font-bold text-[#4c4a44]"
+                      className="mb-2 block text-sm font-bold text-[#475569]"
                     >
                       Date
                     </label>
@@ -1691,7 +1888,7 @@ export function CalendarClient({
                     />
                   </div>
 
-                  <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-[#4c4a44]">
+                  <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-[#475569]">
                     <input
                       type="checkbox"
                       checked={
@@ -1709,7 +1906,7 @@ export function CalendarClient({
                               .checked,
                         })
                       }
-                      className="h-4 w-4 accent-[#687a5e]"
+                      className="h-4 w-4 accent-[#0f172a]"
                     />
 
                     Toute la journée
@@ -1720,7 +1917,7 @@ export function CalendarClient({
                       <div>
                         <label
                           htmlFor="calendar-start"
-                          className="mb-2 block text-sm font-bold text-[#4c4a44]"
+                          className="mb-2 block text-sm font-bold text-[#475569]"
                         >
                           Heure de début
                         </label>
@@ -1753,7 +1950,7 @@ export function CalendarClient({
                       <div>
                         <label
                           htmlFor="calendar-end"
-                          className="mb-2 block text-sm font-bold text-[#4c4a44]"
+                          className="mb-2 block text-sm font-bold text-[#475569]"
                         >
                           Heure de fin
                         </label>
@@ -1786,16 +1983,16 @@ export function CalendarClient({
 
                   {modalMode ===
                     "create" && (
-                    <div className="rounded-2xl border border-[#e3dfd5] bg-[#f5f3ed] p-4 sm:p-5">
+                    <div className="rounded-2xl border border-[#e2e8f0] bg-[#f8fafc] p-4 sm:p-5">
                       <div className="mb-4 flex items-center gap-2">
                         <Repeat2
                           size={
                             18
                           }
-                          className="text-[#687a5e]"
+                          className="text-[#0f172a]"
                         />
 
-                        <p className="font-bold text-[#34342e]">
+                        <p className="font-bold text-[#0f172a]">
                           Répétition
                         </p>
                       </div>
@@ -1804,7 +2001,7 @@ export function CalendarClient({
                         <div>
                           <label
                             htmlFor="calendar-repeat"
-                            className="mb-2 block text-sm font-bold text-[#4c4a44]"
+                            className="mb-2 block text-sm font-bold text-[#475569]"
                           >
                             Fréquence
                           </label>
@@ -1868,7 +2065,7 @@ export function CalendarClient({
                             <div>
                               <label
                                 htmlFor="calendar-repeat-end"
-                                className="mb-2 block text-sm font-bold text-[#4c4a44]"
+                                className="mb-2 block text-sm font-bold text-[#475569]"
                               >
                                 Fin de la répétition
                               </label>
@@ -1921,7 +2118,7 @@ export function CalendarClient({
                               <div>
                                 <label
                                   htmlFor="calendar-repeat-until"
-                                  className="mb-2 block text-sm font-bold text-[#4c4a44]"
+                                  className="mb-2 block text-sm font-bold text-[#475569]"
                                 >
                                   Jusqu&apos;au
                                 </label>
@@ -1978,7 +2175,7 @@ export function CalendarClient({
                   <div>
                     <label
                       htmlFor="calendar-location"
-                      className="mb-2 block text-sm font-bold text-[#4c4a44]"
+                      className="mb-2 block text-sm font-bold text-[#475569]"
                     >
                       Lieu
                     </label>
@@ -2013,7 +2210,7 @@ export function CalendarClient({
                   <div>
                     <label
                       htmlFor="calendar-notes"
-                      className="mb-2 block text-sm font-bold text-[#4c4a44]"
+                      className="mb-2 block text-sm font-bold text-[#475569]"
                     >
                       Notes
                     </label>
@@ -2043,9 +2240,21 @@ export function CalendarClient({
                       placeholder="Informations complémentaires"
                     />
                   </div>
+
+                  <NotifyMembersField
+                    checked={
+                      notifyMembers
+                    }
+                    onCheckedChange={
+                      setNotifyMembers
+                    }
+                    disabled={
+                      saving
+                    }
+                  />
                 </div>
 
-                <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[#e9e5dc] bg-white px-5 py-4 sm:px-6">
+                <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[#e2e8f0] bg-white px-5 py-4 sm:px-6">
                   <div>
                     {modalMode ===
                       "edit" && (
@@ -2087,6 +2296,10 @@ export function CalendarClient({
                             originalForm,
                           );
 
+                          setNotifyMembers(
+                            false,
+                          );
+
                           setModalMode(
                             "view",
                           );
@@ -2094,7 +2307,7 @@ export function CalendarClient({
                           closeModal();
                         }
                       }}
-                      className="min-h-11 rounded-xl border border-[#ded9ce] bg-white px-4 text-sm font-bold text-[#57544d]"
+                      className="min-h-11 rounded-xl border border-[#e2e8f0] bg-white px-4 text-sm font-bold text-[#475569]"
                     >
                       Annuler
                     </button>
@@ -2104,7 +2317,7 @@ export function CalendarClient({
                       disabled={
                         saving
                       }
-                      className="min-h-11 rounded-xl bg-[#687a5e] px-5 text-sm font-bold text-white disabled:opacity-50"
+                      className="min-h-11 rounded-xl bg-[#0f172a] px-5 text-sm font-bold text-white disabled:opacity-50"
                     >
                       {saving
                         ? "Enregistrement..."
@@ -2120,7 +2333,7 @@ export function CalendarClient({
               <>
                 <div className="space-y-6 overflow-y-auto p-5 sm:p-6">
                   {selected?.isRecurring && (
-                    <div className="flex items-center gap-2 rounded-xl border border-[#dde3d9] bg-[#f1f4ef] px-4 py-3 text-sm font-semibold text-[#53614c]">
+                    <div className="flex items-center gap-2 rounded-xl border border-[#bfdbfe] bg-[#eff6ff] px-4 py-3 text-sm font-semibold text-[#1d4ed8]">
                       <Repeat2
                         size={
                           17
@@ -2136,11 +2349,11 @@ export function CalendarClient({
                       size={
                         20
                       }
-                      className="mt-1 shrink-0 text-[#687a5e]"
+                      className="mt-1 shrink-0 text-[#0f172a]"
                     />
 
                     <div>
-                      <p className="text-xs font-bold uppercase text-[#89857c]">
+                      <p className="text-xs font-bold uppercase text-[#94a3b8]">
                         Date
                       </p>
 
@@ -2157,11 +2370,11 @@ export function CalendarClient({
                       size={
                         20
                       }
-                      className="mt-1 shrink-0 text-[#656159]"
+                      className="mt-1 shrink-0 text-[#64748b]"
                     />
 
                     <div>
-                      <p className="text-xs font-bold uppercase text-[#89857c]">
+                      <p className="text-xs font-bold uppercase text-[#94a3b8]">
                         Horaire
                       </p>
 
@@ -2181,11 +2394,11 @@ export function CalendarClient({
                         size={
                           20
                         }
-                        className="mt-1 shrink-0 text-[#656159]"
+                        className="mt-1 shrink-0 text-[#64748b]"
                       />
 
                       <div>
-                        <p className="text-xs font-bold uppercase text-[#89857c]">
+                        <p className="text-xs font-bold uppercase text-[#94a3b8]">
                           Lieu
                         </p>
 
@@ -2204,11 +2417,11 @@ export function CalendarClient({
                         size={
                           20
                         }
-                        className="mt-1 shrink-0 text-[#656159]"
+                        className="mt-1 shrink-0 text-[#64748b]"
                       />
 
                       <div>
-                        <p className="text-xs font-bold uppercase text-[#89857c]">
+                        <p className="text-xs font-bold uppercase text-[#94a3b8]">
                           Notes
                         </p>
 
@@ -2222,13 +2435,13 @@ export function CalendarClient({
                   )}
                 </div>
 
-                <footer className="flex shrink-0 justify-end gap-2 border-t border-[#e9e5dc] bg-white px-5 py-4 sm:px-6">
+                <footer className="flex shrink-0 justify-end gap-2 border-t border-[#e2e8f0] bg-white px-5 py-4 sm:px-6">
                   <button
                     type="button"
                     onClick={
                       closeModal
                     }
-                    className="min-h-11 rounded-xl border border-[#ded9ce] bg-white px-4 text-sm font-bold"
+                    className="min-h-11 rounded-xl border border-[#e2e8f0] bg-white px-4 text-sm font-bold"
                   >
                     Fermer
                   </button>
@@ -2241,11 +2454,15 @@ export function CalendarClient({
                           originalForm,
                         );
 
+                        setNotifyMembers(
+                          false,
+                        );
+
                         setModalMode(
                           "edit",
                         );
                       }}
-                      className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#687a5e] px-5 text-sm font-bold text-white"
+                      className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0f172a] px-5 text-sm font-bold text-white"
                     >
                       <Pencil
                         size={
@@ -2264,7 +2481,7 @@ export function CalendarClient({
       )}
 
       {pendingScopeAction && (
-        <div className="fixed inset-0 z-[300] flex items-end justify-center bg-black/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-6">
+        <div className="fixed inset-0 z-[300] flex items-end justify-center bg-slate-950/30 p-0 backdrop-blur-[2px] sm:items-center sm:p-6">
           <button
             type="button"
             aria-label="Annuler"
@@ -2277,10 +2494,10 @@ export function CalendarClient({
           <div
             role="dialog"
             aria-modal="true"
-            className="relative z-10 w-full overflow-hidden rounded-t-[24px] border border-[#e6e1d6] bg-white shadow-2xl sm:max-w-md sm:rounded-[24px]"
+            className="relative z-10 w-full overflow-hidden rounded-t-2xl border border-[#e2e8f0] bg-white shadow-2xl sm:max-w-md sm:rounded-2xl"
           >
-            <header className="border-b border-[#ece8df] px-5 py-5 sm:px-6">
-              <div className="flex items-center gap-2 text-[#687a5e]">
+            <header className="border-b border-[#e2e8f0] px-5 py-5 sm:px-6">
+              <div className="flex items-center gap-2 text-[#0f172a]">
                 <Repeat2
                   size={
                     18
@@ -2292,7 +2509,7 @@ export function CalendarClient({
                 </span>
               </div>
 
-              <h3 className="mt-2 text-xl font-black">
+              <h3 className="mt-2 text-xl font-semibold">
                 {pendingScopeAction.kind ===
                 "delete"
                   ? "Que voulez-vous supprimer ?"
@@ -2352,7 +2569,7 @@ export function CalendarClient({
                         choice.scope,
                       )
                     }
-                    className="w-full rounded-xl border border-[#e5e1d8] px-4 py-4 text-left transition hover:bg-[#f5f7f3] disabled:opacity-50"
+                    className="w-full rounded-xl border border-[#e2e8f0] px-4 py-4 text-left transition hover:bg-[#f8fafc] disabled:opacity-50"
                   >
                     <span className="block font-bold">
                       {
@@ -2360,7 +2577,7 @@ export function CalendarClient({
                       }
                     </span>
 
-                    <span className="mt-1 block text-sm text-[#77746c]">
+                    <span className="mt-1 block text-sm text-[#64748b]">
                       {
                         choice.description
                       }
@@ -2379,7 +2596,7 @@ export function CalendarClient({
               )}
             </div>
 
-            <footer className="flex justify-end border-t border-[#ece8df] bg-[#faf9f6] px-5 py-4">
+            <footer className="flex justify-end border-t border-[#e2e8f0] bg-[#f8fafc] px-5 py-4">
               <button
                 type="button"
                 onClick={
@@ -2388,7 +2605,7 @@ export function CalendarClient({
                 disabled={
                   scopeSaving
                 }
-                className="min-h-11 rounded-xl border border-[#ded9ce] bg-white px-4 text-sm font-bold"
+                className="min-h-11 rounded-xl border border-[#e2e8f0] bg-white px-4 text-sm font-bold"
               >
                 Annuler
               </button>
@@ -2408,6 +2625,15 @@ export function CalendarClient({
         }
         onImported={() => {
           refetchEvents();
+
+          showToast(
+            "Planning importé",
+          );
+
+          void publishMemberUpdate(
+            "calendar",
+            false,
+          );
         }}
       />
     </>

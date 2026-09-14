@@ -66,6 +66,12 @@ import {
   uploadResourceFile,
 } from "./resources";
 
+import {
+  createNotification,
+  listUnreadNotifications,
+  markNotificationSeen,
+} from "./notifications";
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
@@ -282,6 +288,31 @@ export default {
         url.pathname === "/v1/calendar-events/split"
       ) {
         return splitCalendarSeries(request, env);
+      }
+
+      /*
+       * NOTIFICATIONS
+       */
+
+      if (
+        request.method === "GET" &&
+        url.pathname === "/v1/notifications"
+      ) {
+        return listUnreadNotifications(request, env);
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname === "/v1/notifications"
+      ) {
+        return createNotification(request, env);
+      }
+
+      if (
+        request.method === "PATCH" &&
+        url.pathname === "/v1/notifications/seen"
+      ) {
+        return markNotificationSeen(request, env);
       }
 
       /*
