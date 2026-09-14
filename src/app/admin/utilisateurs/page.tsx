@@ -1,5 +1,11 @@
-import { redirect } from "next/navigation";
+import { MemberDirectory } from "@/components/directory/MemberDirectory";
+import { requireRole } from "@/server/auth/guard";
 
-export default function UsersPage() {
-  redirect("/membre/repertoire");
+export default async function UsersPage() {
+  await requireRole([
+    "admin",
+    "super_admin",
+  ]);
+
+  return <MemberDirectory />;
 }

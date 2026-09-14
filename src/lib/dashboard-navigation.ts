@@ -6,10 +6,8 @@ export type DashboardRole =
 export type DashboardIconKey =
   | "dashboard"
   | "calendar"
-  | "directory"
   | "resources"
-  | "profile"
-  | "events"
+  | "members"
   | "content"
   | "images"
   | "siteGallery"
@@ -20,7 +18,7 @@ export type DashboardNavigationItem = {
   href: string;
   iconKey: DashboardIconKey;
   roles: DashboardRole[];
-  group: "main" | "management" | "account";
+  group: "main" | "management";
 };
 
 const ALL_ROLES: DashboardRole[] = [
@@ -29,7 +27,7 @@ const ALL_ROLES: DashboardRole[] = [
   "super_admin",
 ];
 
-const MANAGEMENT_ROLES: DashboardRole[] = [
+const ADMIN_ROLES: DashboardRole[] = [
   "admin",
   "super_admin",
 ];
@@ -51,13 +49,6 @@ export const dashboardNavigationItems:
       group: "main",
     },
     {
-      label: "Membres",
-      href: "/membre/repertoire",
-      iconKey: "directory",
-      roles: ALL_ROLES,
-      group: "main",
-    },
-    {
       label: "Répertoire",
       href: "/membre/ressources",
       iconKey: "resources",
@@ -66,47 +57,39 @@ export const dashboardNavigationItems:
     },
 
     {
-      label: "Événements",
-      href: "/admin/evenements",
-      iconKey: "events",
-      roles: MANAGEMENT_ROLES,
+      label: "Membres",
+      href: "/admin/utilisateurs",
+      iconKey: "members",
+      roles: ADMIN_ROLES,
       group: "management",
     },
     {
-      label: "Contenu",
+      label: "Contenu du site",
       href: "/admin/contenu",
       iconKey: "content",
-      roles: MANAGEMENT_ROLES,
+      roles: ADMIN_ROLES,
       group: "management",
     },
     {
       label: "Images",
       href: "/admin/images",
       iconKey: "images",
-      roles: MANAGEMENT_ROLES,
+      roles: ADMIN_ROLES,
       group: "management",
     },
     {
       label: "Galerie",
       href: "/admin/galerie",
       iconKey: "siteGallery",
-      roles: MANAGEMENT_ROLES,
+      roles: ADMIN_ROLES,
       group: "management",
     },
     {
       label: "Paramètres",
       href: "/admin/settings",
       iconKey: "settings",
-      roles: MANAGEMENT_ROLES,
+      roles: ADMIN_ROLES,
       group: "management",
-    },
-
-    {
-      label: "Mon profil",
-      href: "/membre/profil",
-      iconKey: "profile",
-      roles: ALL_ROLES,
-      group: "account",
     },
   ];
 
@@ -114,8 +97,7 @@ export function getDashboardNavigation(
   role: DashboardRole,
 ) {
   return dashboardNavigationItems.filter(
-    (item) =>
-      item.roles.includes(role),
+    (item) => item.roles.includes(role),
   );
 }
 

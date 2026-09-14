@@ -288,11 +288,11 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">
-      <aside className="h-fit rounded-2xl border border-[#e2ded5] bg-white p-5">
+    <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+      <aside className="h-fit rounded-2xl border border-[#e2e8f0] bg-white p-5 shadow-sm">
         <div className="flex flex-col items-center text-center">
           <div className="relative">
-            <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full bg-[#e6ece2] text-2xl font-bold text-[#5e7055]">
+            <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full bg-[#f1f5f9] text-2xl font-semibold text-[#475569]">
               {avatarUrl && !avatarFailed ? (
                 <img
                   src={avatarUrl}
@@ -309,7 +309,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
               type="button"
               disabled={avatarLoading}
               onClick={() => fileInputRef.current?.click()}
-              className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-[#687a5e] text-white shadow-sm transition hover:bg-[#596950] disabled:opacity-50"
+              className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-slate-900 text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
               aria-label="Changer la photo"
             >
               {avatarLoading ? (
@@ -328,15 +328,15 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
             />
           </div>
 
-          <h2 className="mt-4 text-lg font-semibold text-[#302f29]">
+          <h2 className="mt-4 text-lg font-semibold text-[#0f172a]">
             {firstname} {lastname}
           </h2>
 
-          <span className="mt-2 rounded-full bg-[#eef2eb] px-3 py-1 text-xs font-bold text-[#5c6d54]">
+          <span className="mt-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
             {roleLabel(profile.role)}
           </span>
 
-          <p className="mt-4 break-all text-sm text-[#817d74]">
+          <p className="mt-4 break-all text-sm text-[#64748b]">
             {profile.email}
           </p>
 
@@ -345,7 +345,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
               type="button"
               disabled={avatarLoading}
               onClick={() => void removeAvatar()}
-              className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-[#a45f5f] hover:text-[#884b4b]"
+              className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-[#dc2626] hover:text-[#b91c1c]"
             >
               <Trash2 size={13} />
               Supprimer la photo
@@ -361,28 +361,28 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
       <div className="grid gap-5">
         <form
           onSubmit={saveProfile}
-          className="rounded-2xl border border-[#e2ded5] bg-white"
+          className="rounded-2xl border border-[#e2e8f0] bg-white shadow-sm"
         >
-          <header className="border-b border-[#ebe7df] px-5 py-4">
-            <h2 className="text-base font-bold text-[#302f29]">
+          <header className="border-b border-[#e2e8f0] px-5 py-4">
+            <h2 className="text-base font-semibold text-[#0f172a]">
               Informations personnelles
             </h2>
 
-            <p className="mt-1 text-xs text-[#918d84]">
+            <p className="mt-1 text-xs text-[#64748b]">
               Informations associées à votre compte membre.
             </p>
           </header>
 
           <div className="grid gap-4 p-5 sm:grid-cols-2">
             <label className="block">
-              <span className="mb-1.5 block text-xs font-bold text-[#656159]">
+              <span className="mb-1.5 block text-xs font-semibold text-[#475569]">
                 Prénom
               </span>
 
               <div className="relative">
                 <UserRound
                   size={15}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#99958d]"
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]"
                 />
 
                 <input
@@ -391,20 +391,20 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
                   required
                   minLength={2}
                   maxLength={80}
-                  className="h-10 w-full rounded-lg border border-[#ddd9cf] pl-9 pr-3 text-sm outline-none focus:border-[#aab5a3]"
+                  className="h-10 w-full rounded-lg border border-[#e2e8f0] pl-9 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                 />
               </div>
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-xs font-bold text-[#656159]">
+              <span className="mb-1.5 block text-xs font-semibold text-[#475569]">
                 Nom
               </span>
 
               <div className="relative">
                 <UserRound
                   size={15}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#99958d]"
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]"
                 />
 
                 <input
@@ -413,20 +413,20 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
                   required
                   minLength={2}
                   maxLength={80}
-                  className="h-10 w-full rounded-lg border border-[#ddd9cf] pl-9 pr-3 text-sm outline-none focus:border-[#aab5a3]"
+                  className="h-10 w-full rounded-lg border border-[#e2e8f0] pl-9 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                 />
               </div>
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-xs font-bold text-[#656159]">
+              <span className="mb-1.5 block text-xs font-semibold text-[#475569]">
                 Téléphone
               </span>
 
               <div className="relative">
                 <Phone
                   size={15}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#99958d]"
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]"
                 />
 
                 <input
@@ -435,26 +435,26 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
                   onChange={(event) => setPhone(event.target.value)}
                   maxLength={30}
                   placeholder="Optionnel"
-                  className="h-10 w-full rounded-lg border border-[#ddd9cf] pl-9 pr-3 text-sm outline-none focus:border-[#aab5a3]"
+                  className="h-10 w-full rounded-lg border border-[#e2e8f0] pl-9 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                 />
               </div>
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-xs font-bold text-[#656159]">
+              <span className="mb-1.5 block text-xs font-semibold text-[#475569]">
                 Email
               </span>
 
               <div className="relative">
                 <Mail
                   size={15}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#aaa69d]"
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]"
                 />
 
                 <input
                   value={profile.email}
                   disabled
-                  className="h-10 w-full cursor-not-allowed rounded-lg border border-[#e4e0d7] bg-[#f7f5f0] pl-9 pr-3 text-sm text-[#8a867d]"
+                  className="h-10 w-full cursor-not-allowed rounded-lg border border-[#e2e8f0] bg-[#f8fafc] pl-9 pr-3 text-sm text-[#94a3b8]"
                 />
               </div>
             </label>
@@ -463,7 +463,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
           {(profileSuccess || profileError) && (
             <div className="px-5 pb-1">
               {profileSuccess && (
-                <p className="flex items-center gap-2 text-sm font-semibold text-[#607157]">
+                <p className="flex items-center gap-2 text-sm font-semibold text-[#047857]">
                   <CheckCircle2 size={15} />
                   {profileSuccess}
                 </p>
@@ -475,11 +475,11 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
             </div>
           )}
 
-          <footer className="flex justify-end border-t border-[#ebe7df] px-5 py-4">
+          <footer className="flex justify-end border-t border-[#e2e8f0] px-5 py-4">
             <button
               type="submit"
               disabled={profileSaving}
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#687a5e] px-4 text-sm font-bold text-white transition hover:bg-[#596950] disabled:opacity-50"
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
             >
               {profileSaving && (
                 <LoaderCircle size={15} className="animate-spin" />
@@ -491,17 +491,17 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
 
         <form
           onSubmit={changePassword}
-          className="rounded-2xl border border-[#e2ded5] bg-white"
+          className="rounded-2xl border border-[#e2e8f0] bg-white shadow-sm"
         >
-          <header className="flex items-start gap-3 border-b border-[#ebe7df] px-5 py-4">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#eef2eb] text-[#687a5e]">
+          <header className="flex items-start gap-3 border-b border-[#e2e8f0] px-5 py-4">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
               <ShieldCheck size={18} />
             </div>
 
             <div>
-              <h2 className="text-base font-bold text-[#302f29]">Sécurité</h2>
+              <h2 className="text-base font-semibold text-[#0f172a]">Sécurité</h2>
 
-              <p className="mt-1 text-xs text-[#918d84]">
+              <p className="mt-1 text-xs text-[#64748b]">
                 Modifiez le mot de passe de votre compte.
               </p>
             </div>
@@ -509,14 +509,14 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
 
           <div className="grid gap-4 p-5">
             <label className="block">
-              <span className="mb-1.5 block text-xs font-bold text-[#656159]">
+              <span className="mb-1.5 block text-xs font-semibold text-[#475569]">
                 Mot de passe actuel
               </span>
 
               <div className="relative">
                 <KeyRound
                   size={15}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#99958d]"
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]"
                 />
 
                 <input
@@ -525,14 +525,14 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
                   value={currentPassword}
                   onChange={(event) => setCurrentPassword(event.target.value)}
                   required
-                  className="h-10 w-full rounded-lg border border-[#ddd9cf] pl-9 pr-3 text-sm outline-none focus:border-[#aab5a3]"
+                  className="h-10 w-full rounded-lg border border-[#e2e8f0] pl-9 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                 />
               </div>
             </label>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block">
-                <span className="mb-1.5 block text-xs font-bold text-[#656159]">
+                <span className="mb-1.5 block text-xs font-semibold text-[#475569]">
                   Nouveau mot de passe
                 </span>
 
@@ -544,12 +544,12 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
                   required
                   minLength={8}
                   maxLength={128}
-                  className="h-10 w-full rounded-lg border border-[#ddd9cf] px-3 text-sm outline-none focus:border-[#aab5a3]"
+                  className="h-10 w-full rounded-lg border border-[#e2e8f0] px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                 />
               </label>
 
               <label className="block">
-                <span className="mb-1.5 block text-xs font-bold text-[#656159]">
+                <span className="mb-1.5 block text-xs font-semibold text-[#475569]">
                   Confirmer
                 </span>
 
@@ -561,13 +561,13 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
                   required
                   minLength={8}
                   maxLength={128}
-                  className="h-10 w-full rounded-lg border border-[#ddd9cf] px-3 text-sm outline-none focus:border-[#aab5a3]"
+                  className="h-10 w-full rounded-lg border border-[#e2e8f0] px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                 />
               </label>
             </div>
 
             {passwordSuccess && (
-              <p className="flex items-center gap-2 text-sm font-semibold text-[#607157]">
+              <p className="flex items-center gap-2 text-sm font-semibold text-[#047857]">
                 <CheckCircle2 size={15} />
                 {passwordSuccess}
               </p>
@@ -580,18 +580,18 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
             <div>
               <Link
                 href="/mot-de-passe-oublie"
-                className="text-xs font-bold text-[#687a5e] hover:underline"
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline"
               >
                 Mot de passe oublié ?
               </Link>
             </div>
           </div>
 
-          <footer className="flex justify-end border-t border-[#ebe7df] px-5 py-4">
+          <footer className="flex justify-end border-t border-[#e2e8f0] px-5 py-4">
             <button
               type="submit"
               disabled={passwordSaving}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#d8d4ca] bg-white px-4 text-sm font-bold text-[#4e4b44] transition hover:bg-[#f5f3ee] disabled:opacity-50"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#e2e8f0] bg-white px-4 text-sm font-semibold text-[#334155] transition hover:bg-[#f8fafc] disabled:opacity-50"
             >
               {passwordSaving && (
                 <LoaderCircle size={15} className="animate-spin" />

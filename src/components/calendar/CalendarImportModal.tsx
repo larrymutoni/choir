@@ -287,10 +287,10 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
   }
 
   const inputClass =
-    "w-full rounded-lg border border-[#ddd9cf] bg-white px-3 py-2.5 text-[16px] text-[#292923] outline-none transition focus:border-[#687a5e] focus:ring-3 focus:ring-[#687a5e]/10 sm:text-sm";
+    "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[16px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 sm:text-sm";
 
   return (
-    <div className="fixed inset-0 z-[350] flex items-end justify-center bg-black/40 p-0 backdrop-blur-[2px] sm:items-center sm:p-6">
+    <div className="fixed inset-0 z-[350] flex items-end justify-center bg-slate-950/30 p-0 backdrop-blur-[2px] sm:items-center sm:p-6">
       <button
         type="button"
         aria-label="Fermer"
@@ -301,22 +301,13 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
       <div
         role="dialog"
         aria-modal="true"
-        className="relative z-10 flex max-h-[94vh] w-full flex-col overflow-hidden rounded-t-[24px] border border-[#e5e1d7] bg-[#faf9f6] shadow-2xl sm:max-w-6xl sm:rounded-[24px]"
+        className="relative z-10 flex max-h-[94vh] w-full flex-col overflow-hidden rounded-t-2xl border border-[#e2e8f0] bg-[#f8fafc] shadow-2xl sm:max-w-6xl sm:rounded-2xl"
       >
-        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[#e9e5dc] bg-white px-5 py-4 sm:px-6">
+        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[#e2e8f0] bg-white px-5 py-4 sm:px-6">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#77746c]">
-              Calendrier
-            </p>
-
-            <h2 className="mt-1 text-xl font-black text-[#25251f]">
+            <h2 className="text-lg font-semibold text-slate-950">
               Importer un planning
             </h2>
-
-            <p className="mt-1 text-sm text-[#77746c]">
-              Vérifiez les événements détectés avant de les ajouter au
-              calendrier.
-            </p>
           </div>
 
           <button
@@ -324,7 +315,7 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
             onClick={close}
             disabled={parsing || importing}
             aria-label="Fermer"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#625f58] transition hover:bg-[#f2f0ea] disabled:opacity-50"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#64748b] transition hover:bg-[#f1f5f9] disabled:opacity-50"
           >
             <X size={19} />
           </button>
@@ -359,27 +350,27 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
               type="button"
               disabled={parsing}
               onClick={() => fileInputRef.current?.click()}
-              className="flex min-h-64 w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#d9d5ca] bg-white px-6 py-10 text-center transition hover:border-[#aeb8a8] hover:bg-[#fbfcfa] disabled:opacity-60"
+              className="flex min-h-64 w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#cbd5e1] bg-white px-6 py-10 text-center transition hover:border-[#94a3b8] hover:bg-[#f8fafc] disabled:opacity-60"
             >
               {parsing ? (
                 <>
-                  <Loader2 size={34} className="animate-spin text-[#687a5e]" />
+                  <Loader2 size={34} className="animate-spin text-[#0f172a]" />
 
-                  <span className="mt-4 font-bold text-[#34342e]">
+                  <span className="mt-4 font-bold text-[#0f172a]">
                     Analyse du planning…
                   </span>
                 </>
               ) : (
                 <>
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eef1eb] text-[#687a5e]">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f1f5f9] text-[#0f172a]">
                     <Upload size={25} />
                   </div>
 
-                  <span className="mt-4 text-base font-bold text-[#34342e]">
+                  <span className="mt-4 text-base font-bold text-[#0f172a]">
                     Choisir un fichier
                   </span>
 
-                  <span className="mt-2 max-w-md text-sm leading-6 text-[#77746c]">
+                  <span className="mt-2 max-w-md text-sm leading-6 text-[#64748b]">
                     XLSX, CSV ou DOCX · maximum 10 Mo
                   </span>
                 </>
@@ -388,19 +379,19 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
           </div>
         ) : (
           <>
-            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#e9e5dc] bg-[#faf9f6] px-4 py-3 sm:px-6">
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 sm:px-6">
               <div className="flex min-w-0 items-center gap-3">
                 <FileSpreadsheet
                   size={20}
-                  className="shrink-0 text-[#687a5e]"
+                  className="shrink-0 text-[#0f172a]"
                 />
 
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-[#33332d]">
+                  <p className="truncate text-sm font-bold text-[#0f172a]">
                     {fileName}
                   </p>
 
-                  <p className="text-xs text-[#77746c]">
+                  <p className="text-xs text-[#64748b]">
                     {rows.length} événement
                     {rows.length > 1 ? "s" : ""} détecté
                     {rows.length > 1 ? "s" : ""}
@@ -421,7 +412,7 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
                     {warningCount} à vérifier
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#edf2ea] px-3 py-1.5 text-xs font-bold text-[#53614c]">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#ecfdf5] px-3 py-1.5 text-xs font-bold text-[#047857]">
                     <CheckCircle2 size={14} />
                     Tout est prêt
                   </span>
@@ -431,7 +422,7 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
                   type="button"
                   onClick={reset}
                   disabled={importing}
-                  className="min-h-10 rounded-xl border border-[#ddd9cf] bg-white px-3 text-sm font-bold text-[#5d5a53] transition hover:bg-[#f5f3ed]"
+                  className="min-h-10 rounded-xl border border-[#e2e8f0] bg-white px-3 text-sm font-bold text-[#475569] transition hover:bg-[#f8fafc]"
                 >
                   Autre fichier
                 </button>
@@ -440,7 +431,7 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
                   type="button"
                   onClick={() => setRows((current) => [...current, emptyRow()])}
                   disabled={importing}
-                  className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#ddd9cf] bg-white px-3 text-sm font-bold text-[#4f5c49] transition hover:bg-[#f3f6f1]"
+                  className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#e2e8f0] bg-white px-3 text-sm font-bold text-[#334155] transition hover:bg-[#f8fafc]"
                 >
                   <Plus size={15} />
                   Ajouter une ligne
@@ -449,7 +440,7 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
             </div>
 
             <div className="flex-1 overflow-y-auto">
-              <div className="divide-y divide-[#ece8df]">
+              <div className="divide-y divide-[#e2e8f0]">
                 {rows.map((row, index) => {
                   const validation = rowError(row);
 
@@ -457,7 +448,7 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
                     <div key={row.id} className="bg-white px-4 py-5 sm:px-6">
                       <div className="mb-4 flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-xs font-bold uppercase tracking-wide text-[#8a867d]">
+                          <p className="text-xs font-bold uppercase tracking-wide text-[#94a3b8]">
                             Événement {index + 1}
                           </p>
 
@@ -471,7 +462,7 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
                               <AlertTriangle size={13} />À vérifier
                             </p>
                           ) : (
-                            <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-[#66745f]">
+                            <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-[#047857]">
                               <CheckCircle2 size={13} />
                               Prêt
                             </p>
@@ -497,7 +488,7 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
 
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
                         <div className="md:col-span-5">
-                          <label className="mb-1.5 block text-xs font-bold text-[#646159]">
+                          <label className="mb-1.5 block text-xs font-bold text-[#475569]">
                             Titre
                           </label>
 
@@ -514,7 +505,7 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
                         </div>
 
                         <div className="md:col-span-3">
-                          <label className="mb-1.5 block text-xs font-bold text-[#646159]">
+                          <label className="mb-1.5 block text-xs font-bold text-[#475569]">
                             Date
                           </label>
 
@@ -531,7 +522,7 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
                         </div>
 
                         <div className="flex items-end md:col-span-4">
-                          <label className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-[#ddd9cf] bg-[#faf9f6] px-3 text-sm font-semibold text-[#57544d]">
+                          <label className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 text-sm font-semibold text-[#475569]">
                             <input
                               type="checkbox"
                               checked={row.allDay}
@@ -540,7 +531,7 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
                                   allDay: event.target.checked,
                                 })
                               }
-                              className="h-4 w-4 accent-[#687a5e]"
+                              className="h-4 w-4 accent-[#0f172a]"
                             />
                             Toute la journée
                           </label>
@@ -549,7 +540,7 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
                         {!row.allDay && (
                           <>
                             <div className="md:col-span-3">
-                              <label className="mb-1.5 block text-xs font-bold text-[#646159]">
+                              <label className="mb-1.5 block text-xs font-bold text-[#475569]">
                                 Début
                               </label>
 
@@ -566,7 +557,7 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
                             </div>
 
                             <div className="md:col-span-3">
-                              <label className="mb-1.5 block text-xs font-bold text-[#646159]">
+                              <label className="mb-1.5 block text-xs font-bold text-[#475569]">
                                 Fin
                               </label>
 
@@ -589,7 +580,7 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
                             row.allDay ? "md:col-span-12" : "md:col-span-6"
                           }
                         >
-                          <label className="mb-1.5 block text-xs font-bold text-[#646159]">
+                          <label className="mb-1.5 block text-xs font-bold text-[#475569]">
                             Lieu
                           </label>
 
@@ -607,7 +598,7 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
                         </div>
 
                         <div className="md:col-span-12">
-                          <label className="mb-1.5 block text-xs font-bold text-[#646159]">
+                          <label className="mb-1.5 block text-xs font-bold text-[#475569]">
                             Notes
                           </label>
 
@@ -631,7 +622,7 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
               </div>
             </div>
 
-            <footer className="shrink-0 border-t border-[#e9e5dc] bg-white px-4 py-4 sm:px-6">
+            <footer className="shrink-0 border-t border-[#e2e8f0] bg-white px-4 py-4 sm:px-6">
               {error && (
                 <div
                   role="alert"
@@ -642,8 +633,8 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
               )}
 
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-[#77746c]">
-                  <strong className="text-[#33332d]">{validCount}</strong>{" "}
+                <p className="text-sm text-[#64748b]">
+                  <strong className="text-[#0f172a]">{validCount}</strong>{" "}
                   événement
                   {validCount > 1 ? "s" : ""} prêt
                   {validCount > 1 ? "s" : ""} à être ajouté
@@ -655,7 +646,7 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
                     type="button"
                     onClick={close}
                     disabled={importing}
-                    className="min-h-11 rounded-xl border border-[#ddd9cf] bg-white px-4 text-sm font-bold text-[#57544d]"
+                    className="min-h-11 rounded-xl border border-[#e2e8f0] bg-white px-4 text-sm font-bold text-[#475569]"
                   >
                     Annuler
                   </button>
@@ -666,7 +657,7 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
                     disabled={
                       importing || rows.length === 0 || invalidCount > 0
                     }
-                    className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#687a5e] px-5 text-sm font-bold text-white transition hover:bg-[#56664d] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0f172a] px-5 text-sm font-bold text-white transition hover:bg-[#1e293b] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {importing && (
                       <Loader2 size={16} className="animate-spin" />

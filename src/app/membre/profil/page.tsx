@@ -24,13 +24,9 @@ export default async function ProfilePage() {
   return (
     <main className="mx-auto w-full max-w-5xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-[-0.03em] text-[#292923]">
+        <h1 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">
           Mon profil
         </h1>
-
-        <p className="mt-1 text-sm text-[#817d74]">
-          Gérez vos informations personnelles et la sécurité de votre compte.
-        </p>
       </div>
 
       <ProfileForm

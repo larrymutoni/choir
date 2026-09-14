@@ -36,6 +36,9 @@ import {
   type Song,
 } from "@/components/resources/types";
 
+import { NotifyMembersField } from "@/components/notifications/NotifyMembersField";
+import { publishMemberUpdate } from "@/lib/publish-member-update";
+
 type ApiMessage = {
   message?: string;
   error?: string;
@@ -608,8 +611,8 @@ export function ResourcesLibrary() {
     !selectedSong
       ? "lg:grid-cols-[minmax(0,1fr)_0px_0px]"
       : selectedPartition
-      ? "lg:grid-cols-[280px_minmax(380px,0.85fr)_minmax(460px,1.15fr)]"
-      : "lg:grid-cols-[320px_minmax(0,1fr)_0px]";
+        ? "lg:grid-cols-[340px_minmax(420px,0.9fr)_minmax(480px,1.1fr)]"
+        : "lg:grid-cols-[360px_minmax(0,1fr)_0px]";
 
   const mobileTranslation =
     mobilePane ===
@@ -622,7 +625,7 @@ export function ResourcesLibrary() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[500px] items-center justify-center gap-3 text-sm text-[#77736b]">
+      <div className="flex min-h-[500px] items-center justify-center gap-3 text-sm text-slate-500">
         <LoaderCircle
           size={20}
           className="animate-spin"
@@ -635,101 +638,81 @@ export function ResourcesLibrary() {
 
   return (
     <>
-      <main className="w-full px-2 py-2 sm:px-3 lg:px-4">
-        <div className="mb-2 flex h-10 items-center justify-between gap-4">
-          <div className="flex items-baseline gap-3">
-            <h1 className="text-xl font-semibold tracking-[-0.03em] text-[#292923]">
-              Répertoire
-            </h1>
-
-            <span className="text-xs text-[#969188]">
-              {songs.length}{" "}
-              morceau
-              {songs.length >
-              1
-                ? "x"
-                : ""}
-            </span>
-          </div>
+      <main className="w-full">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <p className="text-sm text-slate-500">
+            <span className="font-semibold text-slate-900">
+              {songs.length}
+            </span>{" "}
+            morceau{songs.length > 1 ? "x" : ""}
+          </p>
 
           {canManage && (
             <button
               type="button"
               onClick={() =>
-                setCreateOpen(
-                  true,
-                )
+                setCreateOpen(true)
               }
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#687a5e] px-3.5 text-sm font-bold text-white transition hover:bg-[#596950]"
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
             >
-              <Plus
-                size={15}
-              />
-
-              Ajouter
+              <Plus size={16} />
+              Ajouter un morceau
             </button>
           )}
         </div>
 
         {error && (
-          <div className="mb-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
           </div>
         )}
 
-        <div className="h-[calc(100dvh-7rem)] min-h-[560px] overflow-hidden rounded-xl border border-[#ddd9cf] bg-white">
+        <div className="h-[calc(100dvh-10rem)] min-h-[600px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div
             className={`flex h-full w-[300%] transition-transform duration-200 ease-out lg:grid lg:w-full lg:translate-x-0 lg:transition-[grid-template-columns] ${mobileTranslation} ${desktopColumns}`}
           >
-            {/* 1 — RÉPERTOIRE */}
-
+            {/* Songs */}
             <section
-              className={`h-full w-1/3 shrink-0 overflow-hidden lg:w-auto ${
+              className={`h-full w-1/3 shrink-0 overflow-hidden bg-white lg:w-auto ${
                 selectedSong
-                  ? "lg:border-r lg:border-[#e5e1d8]"
+                  ? "lg:border-r lg:border-slate-200"
                   : ""
               }`}
             >
-              <div className="border-b border-[#e8e4dc] p-3">
+              <div className="border-b border-slate-200 p-4">
                 <div className="relative">
                   <Search
                     size={16}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9b978e]"
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                   />
 
                   <input
                     type="search"
                     value={search}
-                    onChange={(
-                      event,
-                    ) => {
+                    onChange={(event) => {
                       setSearch(
-                        event.target
-                          .value,
+                        event.target.value,
                       );
 
                       setActiveLetter(
                         null,
                       );
                     }}
-                    placeholder="Rechercher un morceau"
-                    className="h-10 w-full rounded-lg border border-[#ddd9cf] bg-[#f8f7f3] pl-9 pr-3 text-sm outline-none focus:border-[#abb6a4] focus:bg-white"
+                    placeholder="Rechercher un morceau…"
+                    className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
                   />
                 </div>
 
-                <div className="mt-2 flex gap-0.5 overflow-x-auto pb-0.5">
+                <div className="mt-3 flex gap-1 overflow-x-auto pb-1">
                   <button
                     type="button"
                     onClick={() =>
-                      setActiveLetter(
-                        null,
-                      )
+                      setActiveLetter(null)
                     }
-                    className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-bold ${
-                      activeLetter ===
-                      null
-                        ? "bg-[#687a5e] text-white"
-                        : "text-[#77736b]"
+                    className={`shrink-0 rounded-md px-2.5 py-1 text-[11px] font-semibold transition ${
+                      activeLetter === null
+                        ? "bg-slate-900 text-white"
+                        : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
                     }`}
                   >
                     Tous
@@ -744,25 +727,21 @@ export function ResourcesLibrary() {
 
                       return (
                         <button
-                          key={
-                            letter
-                          }
+                          key={letter}
                           type="button"
-                          disabled={
-                            !available
-                          }
+                          disabled={!available}
                           onClick={() =>
                             setActiveLetter(
                               letter,
                             )
                           }
-                          className={`shrink-0 rounded px-1.5 py-1 text-[10px] font-bold ${
+                          className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold transition ${
                             activeLetter ===
                             letter
-                              ? "bg-[#687a5e] text-white"
+                              ? "bg-slate-900 text-white"
                               : available
-                              ? "text-[#69665f] hover:bg-[#efede7]"
-                              : "text-[#d2cec6]"
+                                ? "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                                : "cursor-default text-slate-200"
                           }`}
                         >
                           {letter}
@@ -774,23 +753,46 @@ export function ResourcesLibrary() {
               </div>
 
               {!selectedSong && (
-                <div className="grid grid-cols-[minmax(0,1fr)_minmax(170px,0.45fr)] border-b border-[#e8e4dc] bg-[#faf9f6] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[#99958d]">
+                <div className="hidden grid-cols-[minmax(0,1.5fr)_minmax(160px,0.7fr)_90px_100px] border-b border-slate-200 bg-slate-50 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 sm:grid">
                   <span>
                     Morceau
                   </span>
 
                   <span>
-                    Artiste / compositeur
+                    Compositeur
+                  </span>
+
+                  <span className="text-center">
+                    Fichiers
+                  </span>
+
+                  <span>
+                    Modifié
                   </span>
                 </div>
               )}
 
-              <div className="h-[calc(100%-91px)] overflow-y-auto">
+              <div
+                className={
+                  selectedSong
+                    ? "h-[calc(100%-109px)] overflow-y-auto"
+                    : "h-[calc(100%-150px)] overflow-y-auto"
+                }
+              >
                 {filteredSongs.length ===
                 0 ? (
-                  <p className="px-5 py-10 text-center text-sm text-[#99958d]">
-                    Aucun morceau
-                  </p>
+                  <div className="flex h-48 items-center justify-center px-6 text-center">
+                    <div>
+                      <Music2
+                        size={26}
+                        className="mx-auto text-slate-300"
+                      />
+
+                      <p className="mt-3 text-sm text-slate-500">
+                        Aucun morceau trouvé
+                      </p>
+                    </div>
+                  </div>
                 ) : (
                   filteredSongs.map(
                     (song) => {
@@ -798,38 +800,99 @@ export function ResourcesLibrary() {
                         selectedSongId ===
                         song.id;
 
-                      if (
-                        !selectedSong
-                      ) {
+                      const audioCount =
+                        song.files.filter(
+                          (file) =>
+                            file.kind ===
+                            "audio",
+                        ).length;
+
+                      const scoreCount =
+                        song.files.filter(
+                          (file) =>
+                            file.kind ===
+                            "score",
+                        ).length;
+
+                      if (!selectedSong) {
                         return (
                           <button
-                            key={
-                              song.id
-                            }
+                            key={song.id}
                             type="button"
                             onClick={() =>
-                              openSong(
-                                song,
-                              )
+                              openSong(song)
                             }
-                            className="grid w-full grid-cols-[minmax(0,1fr)_minmax(170px,0.45fr)] items-center border-b border-[#efede7] px-4 py-3 text-left transition hover:bg-[#f5f3ee]"
+                            className="group w-full border-b border-slate-100 px-4 py-3 text-left transition hover:bg-slate-50 sm:grid sm:grid-cols-[minmax(0,1.5fr)_minmax(160px,0.7fr)_90px_100px] sm:items-center sm:px-5"
                           >
                             <span className="flex min-w-0 items-center gap-3">
-                              <Music2
-                                size={16}
-                                className="shrink-0 text-[#687a5e]"
-                              />
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition group-hover:bg-blue-50 group-hover:text-blue-600">
+                                <Music2
+                                  size={15}
+                                />
+                              </span>
 
-                              <span className="truncate text-sm font-semibold text-[#37362f]">
-                                {
-                                  song.title
-                                }
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-semibold text-slate-900">
+                                  {song.title}
+                                </span>
+
+                                <span className="mt-0.5 block truncate text-xs text-slate-500 sm:hidden">
+                                  {song.composer ??
+                                    "Compositeur non renseigné"}
+                                </span>
                               </span>
                             </span>
 
-                            <span className="truncate text-sm text-[#858178]">
+                            <span className="hidden truncate text-sm text-slate-500 sm:block">
                               {song.composer ??
                                 "—"}
+                            </span>
+
+                            <span className="mt-2 flex items-center gap-2 text-xs text-slate-500 sm:mt-0 sm:justify-center">
+                              {audioCount >
+                                0 && (
+                                <span className="inline-flex items-center gap-1">
+                                  <FileAudio
+                                    size={13}
+                                  />
+                                  {
+                                    audioCount
+                                  }
+                                </span>
+                              )}
+
+                              {scoreCount >
+                                0 && (
+                                <span className="inline-flex items-center gap-1">
+                                  <FileText
+                                    size={13}
+                                  />
+                                  {
+                                    scoreCount
+                                  }
+                                </span>
+                              )}
+
+                              {audioCount ===
+                                0 &&
+                                scoreCount ===
+                                  0 &&
+                                "—"}
+                            </span>
+
+                            <span className="hidden text-xs text-slate-400 sm:block">
+                              {new Intl.DateTimeFormat(
+                                "fr-FR",
+                                {
+                                  day: "2-digit",
+                                  month:
+                                    "short",
+                                },
+                              ).format(
+                                new Date(
+                                  song.updatedAt,
+                                ),
+                              )}
                             </span>
                           </button>
                         );
@@ -837,44 +900,44 @@ export function ResourcesLibrary() {
 
                       return (
                         <button
-                          key={
-                            song.id
-                          }
+                          key={song.id}
                           type="button"
                           onClick={() =>
-                            openSong(
-                              song,
-                            )
+                            openSong(song)
                           }
-                          className={`flex w-full items-center gap-2.5 border-b border-[#efede7] px-3 py-2.5 text-left transition ${
+                          className={`flex w-full items-center gap-3 border-b border-slate-100 px-3 py-3 text-left transition ${
                             selected
-                              ? "bg-[#e5ebe1]"
-                              : "hover:bg-[#f5f3ee]"
+                              ? "bg-blue-50"
+                              : "hover:bg-slate-50"
                           }`}
                         >
-                          <Music2
-                            size={15}
-                            className={
+                          <span
+                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
                               selected
-                                ? "shrink-0 text-[#5c6f53]"
-                                : "shrink-0 text-[#99958d]"
-                            }
-                          />
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-slate-100 text-slate-400"
+                            }`}
+                          >
+                            <Music2
+                              size={15}
+                            />
+                          </span>
 
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-semibold text-[#37362f]">
-                              {
-                                song.title
-                              }
+                            <span
+                              className={`block truncate text-sm font-semibold ${
+                                selected
+                                  ? "text-blue-950"
+                                  : "text-slate-900"
+                              }`}
+                            >
+                              {song.title}
                             </span>
 
-                            {song.composer && (
-                              <span className="mt-0.5 block truncate text-xs text-[#99958d]">
-                                {
-                                  song.composer
-                                }
-                              </span>
-                            )}
+                            <span className="mt-0.5 block truncate text-xs text-slate-500">
+                              {song.composer ??
+                                "—"}
+                            </span>
                           </span>
                         </button>
                       );
@@ -884,24 +947,21 @@ export function ResourcesLibrary() {
               </div>
             </section>
 
-            {/* 2 — MORCEAU / LECTEUR */}
-
+            {/* Song details */}
             <section
-              className={`h-full w-1/3 shrink-0 overflow-hidden lg:w-auto ${
+              className={`h-full w-1/3 shrink-0 overflow-hidden bg-white lg:w-auto ${
                 selectedPartition
-                  ? "lg:border-r lg:border-[#e5e1d8]"
+                  ? "lg:border-r lg:border-slate-200"
                   : ""
               }`}
             >
               {selectedSong && (
                 <div className="flex h-full flex-col">
-                  <header className="flex min-h-[64px] shrink-0 items-center gap-2 border-b border-[#e8e4dc] px-3">
+                  <header className="flex min-h-[72px] shrink-0 items-center gap-2 border-b border-slate-200 px-4">
                     <button
                       type="button"
-                      onClick={
-                        closeSong
-                      }
-                      className="flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-bold text-[#66635c] transition hover:bg-[#f1efe9]"
+                      onClick={closeSong}
+                      className="flex h-9 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
                     >
                       <ArrowLeft
                         size={15}
@@ -913,23 +973,20 @@ export function ResourcesLibrary() {
                     </button>
 
                     <div className="min-w-0 flex-1">
-                      <h2 className="truncate text-base font-bold text-[#33322c]">
+                      <h2 className="truncate text-base font-semibold text-slate-950">
                         {
                           selectedSong.title
                         }
                       </h2>
 
-                      {selectedSong.composer && (
-                        <p className="mt-0.5 truncate text-xs text-[#969188]">
-                          {
-                            selectedSong.composer
-                          }
-                        </p>
-                      )}
+                      <p className="mt-0.5 truncate text-xs text-slate-500">
+                        {selectedSong.composer ??
+                          "Compositeur non renseigné"}
+                      </p>
                     </div>
 
                     {canManage && (
-                      <>
+                      <div className="flex shrink-0 items-center gap-1">
                         <button
                           type="button"
                           onClick={() =>
@@ -937,27 +994,13 @@ export function ResourcesLibrary() {
                               true,
                             )
                           }
-                          className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#ddd9cf] px-2.5 text-xs font-bold text-[#625f57] hover:bg-[#f5f3ee]"
+                          className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                          aria-label="Modifier le morceau"
+                          title="Modifier"
                         >
                           <Pencil
-                            size={13}
+                            size={15}
                           />
-                          Modifier
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setUploadKind(
-                              "audio",
-                            )
-                          }
-                          className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#ddd9cf] px-2.5 text-xs font-bold text-[#625f57] hover:bg-[#f5f3ee]"
-                        >
-                          <Plus
-                            size={13}
-                          />
-                          Son
                         </button>
 
                         <button
@@ -971,96 +1014,136 @@ export function ResourcesLibrary() {
                               selectedSong,
                             )
                           }
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-[#ad6262] hover:bg-red-50 disabled:opacity-40"
+                          className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
                           aria-label="Supprimer le morceau"
+                          title="Supprimer"
                         >
                           <Trash2
-                            size={14}
+                            size={15}
                           />
                         </button>
-                      </>
+                      </div>
                     )}
                   </header>
 
-                  <div className="min-h-0 flex-1 overflow-y-auto">
-                    <section className="px-5 py-6 sm:px-7">
-                      {audios.length ===
-                      0 ? (
-                        <div className="py-14 text-center">
+                  <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/50 p-4 sm:p-5">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-xl border border-slate-200 bg-white p-3.5">
+                        <div className="flex items-center gap-2 text-slate-500">
                           <FileAudio
-                            size={28}
-                            className="mx-auto text-[#aaa69d]"
+                            size={15}
                           />
 
-                          <p className="mt-3 text-sm text-[#8f8b82]">
-                            Aucun son
-                          </p>
+                          <span className="text-xs font-medium">
+                            Audio
+                          </span>
+                        </div>
 
-                          {canManage && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setUploadKind(
-                                  "audio",
-                                )
-                              }
-                              className="mt-3 text-sm font-bold text-[#687a5e]"
-                            >
-                              + Ajouter un son
-                            </button>
-                          )}
+                        <p className="mt-2 text-xl font-semibold text-slate-950">
+                          {audios.length}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 bg-white p-3.5">
+                        <div className="flex items-center gap-2 text-slate-500">
+                          <FileText
+                            size={15}
+                          />
+
+                          <span className="text-xs font-medium">
+                            Partitions
+                          </span>
+                        </div>
+
+                        <p className="mt-2 text-xl font-semibold text-slate-950">
+                          {
+                            partitions.length
+                          }
+                        </p>
+                      </div>
+                    </div>
+
+                    <section className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                        <div>
+                          <h3 className="text-sm font-semibold text-slate-900">
+                            Fichiers audio
+                          </h3>
+                        </div>
+
+                        {canManage && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setUploadKind(
+                                "audio",
+                              )
+                            }
+                            className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-blue-600 transition hover:bg-blue-50"
+                          >
+                            <Plus
+                              size={14}
+                            />
+                            Ajouter
+                          </button>
+                        )}
+                      </div>
+
+                      {audios.length ===
+                      0 ? (
+                        <div className="px-4 py-8 text-center">
+                          <FileAudio
+                            size={24}
+                            className="mx-auto text-slate-300"
+                          />
+
+                          <p className="mt-2 text-sm text-slate-500">
+                            Aucun fichier audio
+                          </p>
                         </div>
                       ) : (
-                        <>
+                        <div className="p-4">
                           {audios.length >
                             1 && (
-                            <div className="mb-5">
-                              <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.1em] text-[#99958d]">
-                                Sons
-                              </p>
-
-                              <div className="flex flex-wrap gap-2">
-                                {audios.map(
-                                  (
-                                    audio,
-                                  ) => (
-                                    <button
-                                      key={
-                                        audio.id
-                                      }
-                                      type="button"
-                                      onClick={() =>
-                                        setSelectedAudioId(
-                                          audio.id,
-                                        )
-                                      }
-                                      className={`max-w-full truncate rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
-                                        selectedAudioId ===
-                                        audio.id
-                                          ? "bg-[#687a5e] text-white"
-                                          : "border border-[#ddd9cf] text-[#66635c] hover:bg-[#f5f3ee]"
-                                      }`}
-                                    >
-                                      {fileLabel(
-                                        audio,
-                                      )}
-                                    </button>
-                                  ),
-                                )}
-                              </div>
+                            <div className="mb-4 flex flex-wrap gap-2">
+                              {audios.map(
+                                (
+                                  audio,
+                                ) => (
+                                  <button
+                                    key={
+                                      audio.id
+                                    }
+                                    type="button"
+                                    onClick={() =>
+                                      setSelectedAudioId(
+                                        audio.id,
+                                      )
+                                    }
+                                    className={`max-w-full truncate rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                                      selectedAudioId ===
+                                      audio.id
+                                        ? "border-slate-900 bg-slate-900 text-white"
+                                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                                    }`}
+                                  >
+                                    {fileLabel(
+                                      audio,
+                                    )}
+                                  </button>
+                                ),
+                              )}
                             </div>
                           )}
 
                           {selectedAudio && (
-                            <div className="mx-auto max-w-2xl">
-                              <div className="mb-5 flex items-center justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-bold text-[#4b4841]">
-                                    {fileLabel(
-                                      selectedAudio,
-                                    )}
-                                  </p>
-                                </div>
+                            <div>
+                              <div className="mb-3 flex items-center justify-between gap-3">
+                                <p className="min-w-0 truncate text-sm font-medium text-slate-700">
+                                  {fileLabel(
+                                    selectedAudio,
+                                  )}
+                                </p>
 
                                 {canManage && (
                                   <button
@@ -1074,7 +1157,8 @@ export function ResourcesLibrary() {
                                         selectedAudio,
                                       )
                                     }
-                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#ad6262] hover:bg-red-50 disabled:opacity-40"
+                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                                    aria-label="Supprimer le fichier audio"
                                   >
                                     <Trash2
                                       size={14}
@@ -1090,123 +1174,134 @@ export function ResourcesLibrary() {
                               />
                             </div>
                           )}
-                        </>
+                        </div>
                       )}
                     </section>
 
-                    {(partitions.length >
-                      0 ||
-                      canManage) && (
-                      <section className="border-t border-[#e9e5dd] px-5 py-5 sm:px-7">
-                        <div className="mb-2 flex items-center justify-between">
-                          <h3 className="text-sm font-bold text-[#44423c]">
-                            Partitions
-                          </h3>
+                    <section className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                        <h3 className="text-sm font-semibold text-slate-900">
+                          Partitions
+                        </h3>
 
-                          {canManage && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setUploadKind(
-                                  "score",
-                                )
-                              }
-                              className="inline-flex items-center gap-1 text-xs font-bold text-[#687a5e]"
-                            >
-                              <Plus
-                                size={13}
-                              />
-                              Ajouter
-                            </button>
-                          )}
-                        </div>
+                        {canManage && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setUploadKind(
+                                "score",
+                              )
+                            }
+                            className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-blue-600 transition hover:bg-blue-50"
+                          >
+                            <Plus
+                              size={14}
+                            />
+                            Ajouter
+                          </button>
+                        )}
+                      </div>
 
-                        {partitions.length ===
-                        0 ? (
-                          <p className="py-5 text-sm text-[#99958d]">
+                      {partitions.length ===
+                      0 ? (
+                        <div className="px-4 py-8 text-center">
+                          <FileText
+                            size={24}
+                            className="mx-auto text-slate-300"
+                          />
+
+                          <p className="mt-2 text-sm text-slate-500">
                             Aucune partition
                           </p>
-                        ) : (
-                          <div className="divide-y divide-[#efede7]">
-                            {partitions.map(
-                              (
-                                partition,
-                              ) => (
-                                <button
-                                  key={
-                                    partition.id
-                                  }
-                                  type="button"
-                                  onClick={() =>
-                                    openPartition(
-                                      partition,
-                                    )
-                                  }
-                                  className={`group flex w-full items-center gap-3 py-3 text-left transition ${
-                                    selectedPartitionId ===
-                                    partition.id
-                                      ? "text-[#526049]"
-                                      : ""
-                                  }`}
-                                >
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-slate-100">
+                          {partitions.map(
+                            (
+                              partition,
+                            ) => (
+                              <button
+                                key={
+                                  partition.id
+                                }
+                                type="button"
+                                onClick={() =>
+                                  openPartition(
+                                    partition,
+                                  )
+                                }
+                                className={`group flex w-full items-center gap-3 px-4 py-3 text-left transition ${
+                                  selectedPartitionId ===
+                                  partition.id
+                                    ? "bg-blue-50"
+                                    : "hover:bg-slate-50"
+                                }`}
+                              >
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-500">
                                   <FileText
-                                    size={17}
-                                    className="shrink-0 text-[#687a5e]"
+                                    size={16}
                                   />
+                                </span>
 
-                                  <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-sm font-semibold text-[#45423c]">
-                                      {fileLabel(
-                                        partition,
-                                      )}
-                                    </span>
-
-                                    <span className="mt-0.5 block text-xs text-[#99958d]">
-                                      {formatFileSize(
-                                        partition.sizeBytes,
-                                      )}
-                                    </span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-sm font-medium text-slate-900">
+                                    {fileLabel(
+                                      partition,
+                                    )}
                                   </span>
 
-                                  <span className="text-xs font-bold text-[#687a5e] opacity-70 transition group-hover:opacity-100">
-                                    Ouvrir
+                                  <span className="mt-0.5 block text-xs text-slate-400">
+                                    {formatFileSize(
+                                      partition.sizeBytes,
+                                    )}
                                   </span>
-                                </button>
-                              ),
-                            )}
-                          </div>
-                        )}
-                      </section>
-                    )}
+                                </span>
+
+                                <span className="text-xs font-semibold text-blue-600 opacity-0 transition group-hover:opacity-100">
+                                  Ouvrir
+                                </span>
+                              </button>
+                            ),
+                          )}
+                        </div>
+                      )}
+                    </section>
                   </div>
                 </div>
               )}
             </section>
 
-            {/* 3 — APERÇU PARTITION */}
-
-            <section className="h-full w-1/3 shrink-0 overflow-hidden lg:w-auto">
+            {/* Preview */}
+            <section className="h-full w-1/3 shrink-0 overflow-hidden bg-white lg:w-auto">
               {selectedPartition && (
                 <div className="flex h-full flex-col">
-                  <header className="flex min-h-[64px] shrink-0 items-center gap-2 border-b border-[#e8e4dc] px-3">
+                  <header className="flex min-h-[72px] shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-4">
                     <button
                       type="button"
                       onClick={
                         closePartition
                       }
-                      className="flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-bold text-[#66635c] hover:bg-[#f1efe9]"
+                      className="flex h-9 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
                     >
                       <ArrowLeft
                         size={15}
                       />
 
-                      Partition
+                      <span className="lg:hidden">
+                        Retour
+                      </span>
                     </button>
 
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-[#33322c]">
+                      <p className="truncate text-sm font-semibold text-slate-900">
                         {fileLabel(
                           selectedPartition,
+                        )}
+                      </p>
+
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        {formatFileSize(
+                          selectedPartition.sizeBytes,
                         )}
                       </p>
                     </div>
@@ -1216,11 +1311,12 @@ export function ResourcesLibrary() {
                         href={downloadUrl(
                           selectedPartition,
                         )}
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#687a5e] hover:bg-[#f1efe9]"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
                         aria-label="Télécharger"
+                        title="Télécharger"
                       >
                         <Download
-                          size={15}
+                          size={16}
                         />
                       </a>
                     )}
@@ -1237,16 +1333,17 @@ export function ResourcesLibrary() {
                             selectedPartition,
                           )
                         }
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#ad6262] hover:bg-red-50 disabled:opacity-40"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                        aria-label="Supprimer la partition"
                       >
                         <Trash2
-                          size={14}
+                          size={15}
                         />
                       </button>
                     )}
                   </header>
 
-                  <div className="min-h-0 flex-1">
+                  <div className="min-h-0 flex-1 bg-slate-100">
                     {selectedPartition.mimeType ===
                     "application/pdf" ? (
                       <iframe
@@ -1256,12 +1353,12 @@ export function ResourcesLibrary() {
                         title={fileLabel(
                           selectedPartition,
                         )}
-                        className="h-full w-full border-0"
+                        className="h-full w-full border-0 bg-white"
                       />
                     ) : selectedPartition.mimeType.startsWith(
                         "image/",
                       ) ? (
-                      <div className="flex h-full items-center justify-center overflow-auto bg-[#f5f3ee] p-4">
+                      <div className="flex h-full items-center justify-center overflow-auto p-6">
                         <img
                           src={resourceUrl(
                             selectedPartition,
@@ -1269,17 +1366,17 @@ export function ResourcesLibrary() {
                           alt={fileLabel(
                             selectedPartition,
                           )}
-                          className="max-h-full max-w-full object-contain"
+                          className="max-h-full max-w-full rounded-lg bg-white object-contain shadow-sm"
                         />
                       </div>
                     ) : (
                       <div className="flex h-full flex-col items-center justify-center px-6 text-center">
                         <FileText
-                          size={40}
-                          className="text-[#8d9986]"
+                          size={36}
+                          className="text-slate-300"
                         />
 
-                        <p className="mt-4 max-w-sm truncate text-sm font-bold text-[#49463f]">
+                        <p className="mt-4 max-w-sm truncate text-sm font-semibold text-slate-700">
                           {fileLabel(
                             selectedPartition,
                           )}
@@ -1291,9 +1388,9 @@ export function ResourcesLibrary() {
                           )}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="mt-4 rounded-lg bg-[#687a5e] px-4 py-2 text-sm font-bold text-white"
+                          className="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
                         >
-                          Ouvrir
+                          Ouvrir le fichier
                         </a>
                       </div>
                     )}
@@ -1419,6 +1516,11 @@ function EditSongModal({
   ] = useState(false);
 
   const [
+    notifyMembers,
+    setNotifyMembers,
+  ] = useState(false);
+
+  const [
     error,
     setError,
   ] = useState("");
@@ -1477,6 +1579,18 @@ function EditSongModal({
                 composer:
                   composer.trim() ||
                   null,
+
+                program:
+                  song.program,
+
+                lyrics:
+                  song.lyrics,
+
+                notes:
+                  song.notes,
+
+                status:
+                  song.status,
               }),
           },
         );
@@ -1495,6 +1609,11 @@ function EditSongModal({
             "Impossible de modifier le morceau.",
         );
       }
+
+      await publishMemberUpdate(
+        "resources",
+        notifyMembers,
+      );
 
       await onSaved();
     } catch (reason) {
@@ -1517,8 +1636,8 @@ function EditSongModal({
         }
         className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl"
       >
-        <header className="flex items-center justify-between border-b border-[#e7e3da] px-5 py-4">
-          <h2 className="text-lg font-semibold text-[#292923]">
+        <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <h2 className="text-lg font-semibold text-slate-900">
             Modifier le morceau
           </h2>
 
@@ -1530,7 +1649,7 @@ function EditSongModal({
             onClick={
               onClose
             }
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#77736b] hover:bg-[#f1efe9]"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
           >
             <X
               size={18}
@@ -1538,9 +1657,17 @@ function EditSongModal({
           </button>
         </header>
 
+        <div className="border-b border-slate-200 px-5 py-3">
+          <NotifyMembersField
+            checked={notifyMembers}
+            onCheckedChange={setNotifyMembers}
+            disabled={saving}
+          />
+        </div>
+
         <div className="p-5">
           <label className="block">
-            <span className="mb-1.5 block text-xs font-bold text-[#656159]">
+            <span className="mb-1.5 block text-xs font-bold text-slate-600">
               Titre *
             </span>
 
@@ -1557,12 +1684,12 @@ function EditSongModal({
                     .value,
                 )
               }
-              className="h-10 w-full rounded-xl border border-[#ddd9cf] px-3 text-sm outline-none focus:border-[#aab5a3]"
+              className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500"
             />
           </label>
 
           <label className="mt-4 block">
-            <span className="mb-1.5 block text-xs font-bold text-[#656159]">
+            <span className="mb-1.5 block text-xs font-bold text-slate-600">
               Artiste / compositeur
             </span>
 
@@ -1579,7 +1706,7 @@ function EditSongModal({
                 )
               }
               placeholder="Optionnel"
-              className="h-10 w-full rounded-xl border border-[#ddd9cf] px-3 text-sm outline-none focus:border-[#aab5a3]"
+              className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500"
             />
           </label>
 
@@ -1590,7 +1717,7 @@ function EditSongModal({
           )}
         </div>
 
-        <footer className="flex justify-end gap-2 border-t border-[#e7e3da] px-5 py-4">
+        <footer className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
           <button
             type="button"
             disabled={
@@ -1599,7 +1726,7 @@ function EditSongModal({
             onClick={
               onClose
             }
-            className="h-10 rounded-xl border border-[#ddd9cf] px-4 text-sm font-bold text-[#656159]"
+            className="h-10 rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-600"
           >
             Annuler
           </button>
@@ -1609,7 +1736,7 @@ function EditSongModal({
             disabled={
               saving
             }
-            className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#687a5e] px-4 text-sm font-bold text-white disabled:opacity-50"
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-bold text-white disabled:opacity-50"
           >
             {saving && (
               <LoaderCircle
@@ -1663,6 +1790,11 @@ function CreateSongModal({
   const [
     saving,
     setSaving,
+  ] = useState(false);
+
+  const [
+    notifyMembers,
+    setNotifyMembers,
   ] = useState(false);
 
   const [
@@ -1888,6 +2020,11 @@ function CreateSongModal({
         }
       }
 
+      await publishMemberUpdate(
+        "resources",
+        notifyMembers,
+      );
+
       await onCreated(
         songId,
       );
@@ -1901,6 +2038,11 @@ function CreateSongModal({
       if (songId) {
         window.alert(
           `Le morceau a été créé, mais certains fichiers n'ont pas pu être envoyés.\n\n${message}`,
+        );
+
+        await publishMemberUpdate(
+          "resources",
+          notifyMembers,
         );
 
         await onCreated(
@@ -1924,8 +2066,8 @@ function CreateSongModal({
         }
         className="flex max-h-[88dvh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
       >
-        <header className="flex shrink-0 items-center justify-between border-b border-[#e7e3da] px-5 py-4">
-          <h2 className="text-lg font-semibold text-[#292923]">
+        <header className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4">
+          <h2 className="text-lg font-semibold text-slate-900">
             Ajouter un morceau
           </h2>
 
@@ -1937,7 +2079,7 @@ function CreateSongModal({
             onClick={
               onClose
             }
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#77736b] hover:bg-[#f1efe9]"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
           >
             <X
               size={18}
@@ -1945,9 +2087,17 @@ function CreateSongModal({
           </button>
         </header>
 
+        <div className="border-b border-slate-200 px-5 py-3">
+          <NotifyMembersField
+            checked={notifyMembers}
+            onCheckedChange={setNotifyMembers}
+            disabled={saving}
+          />
+        </div>
+
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
           <label className="block">
-            <span className="mb-1.5 block text-xs font-bold text-[#656159]">
+            <span className="mb-1.5 block text-xs font-bold text-slate-600">
               Titre *
             </span>
 
@@ -1963,12 +2113,12 @@ function CreateSongModal({
                 )
               }
               placeholder="Nom du morceau"
-              className="h-10 w-full rounded-xl border border-[#ddd9cf] px-3 text-sm outline-none focus:border-[#aab5a3]"
+              className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500"
             />
           </label>
 
           <label className="mt-4 block">
-            <span className="mb-1.5 block text-xs font-bold text-[#656159]">
+            <span className="mb-1.5 block text-xs font-bold text-slate-600">
               Artiste / compositeur
             </span>
 
@@ -1985,7 +2135,7 @@ function CreateSongModal({
                 )
               }
               placeholder="Optionnel"
-              className="h-10 w-full rounded-xl border border-[#ddd9cf] px-3 text-sm outline-none focus:border-[#aab5a3]"
+              className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500"
             />
           </label>
 
@@ -2020,7 +2170,7 @@ function CreateSongModal({
           )}
         </div>
 
-        <footer className="flex shrink-0 justify-end gap-2 border-t border-[#e7e3da] px-5 py-4">
+        <footer className="flex shrink-0 justify-end gap-2 border-t border-slate-200 px-5 py-4">
           <button
             type="button"
             disabled={
@@ -2029,7 +2179,7 @@ function CreateSongModal({
             onClick={
               onClose
             }
-            className="h-10 rounded-xl border border-[#ddd9cf] px-4 text-sm font-bold text-[#656159]"
+            className="h-10 rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-600"
           >
             Annuler
           </button>
@@ -2039,7 +2189,7 @@ function CreateSongModal({
             disabled={
               saving
             }
-            className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#687a5e] px-4 text-sm font-bold text-white disabled:opacity-50"
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-bold text-white disabled:opacity-50"
           >
             {saving && (
               <LoaderCircle
@@ -2095,16 +2245,16 @@ function FilePicker({
     <div className="mt-5">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <h3 className="text-sm font-bold text-[#44423c]">
+          <h3 className="text-sm font-bold text-slate-900">
             {title}
           </h3>
 
-          <p className="mt-0.5 text-xs text-[#99958d]">
+          <p className="mt-0.5 text-xs text-slate-400">
             {description}
           </p>
         </div>
 
-        <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-bold text-[#687a5e]">
+        <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-bold text-blue-600">
           <Plus
             size={14}
           />
@@ -2126,10 +2276,10 @@ function FilePicker({
 
       {files.length ===
       0 ? (
-        <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-[#d8d4ca] bg-[#faf9f6] px-4 py-5 text-sm text-[#7f7b72] hover:border-[#abb6a4]">
+        <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-[#7f7b72] hover:border-blue-400">
           <Upload
             size={17}
-            className="text-[#687a5e]"
+            className="text-blue-600"
           />
 
           Choisir des fichiers
@@ -2147,7 +2297,7 @@ function FilePicker({
           />
         </label>
       ) : (
-        <div className="mt-2 divide-y divide-[#eeeae3] rounded-xl border border-[#e2ded5]">
+        <div className="mt-2 divide-y divide-[#eeeae3] rounded-xl border border-slate-200">
           {files.map(
             (
               file,
@@ -2161,16 +2311,16 @@ function FilePicker({
                 "Sons" ? (
                   <FileAudio
                     size={16}
-                    className="shrink-0 text-[#687a5e]"
+                    className="shrink-0 text-blue-600"
                   />
                 ) : (
                   <FileText
                     size={16}
-                    className="shrink-0 text-[#687a5e]"
+                    className="shrink-0 text-blue-600"
                   />
                 )}
 
-                <span className="min-w-0 flex-1 truncate text-sm text-[#4c4942]">
+                <span className="min-w-0 flex-1 truncate text-sm text-slate-700">
                   {file.name}
                 </span>
 
@@ -2225,6 +2375,11 @@ function UploadFilesModal({
   const [
     saving,
     setSaving,
+  ] = useState(false);
+
+  const [
+    notifyMembers,
+    setNotifyMembers,
   ] = useState(false);
 
   const [
@@ -2362,6 +2517,11 @@ function UploadFilesModal({
         }
       }
 
+      await publishMemberUpdate(
+        "resources",
+        notifyMembers,
+      );
+
       await onComplete();
     } catch (reason) {
       setError(
@@ -2383,16 +2543,16 @@ function UploadFilesModal({
         }
         className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl"
       >
-        <header className="flex items-center justify-between border-b border-[#e7e3da] px-5 py-4">
+        <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
-            <h2 className="text-base font-bold text-[#292923]">
+            <h2 className="text-base font-bold text-slate-900">
               {kind ===
               "audio"
                 ? "Ajouter des sons"
                 : "Ajouter des partitions"}
             </h2>
 
-            <p className="mt-0.5 text-xs text-[#969188]">
+            <p className="mt-0.5 text-xs text-slate-400">
               {song.title}
             </p>
           </div>
@@ -2402,13 +2562,21 @@ function UploadFilesModal({
             onClick={
               onClose
             }
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#77736b] hover:bg-[#f1efe9]"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
           >
             <X
               size={17}
             />
           </button>
         </header>
+
+        <div className="border-b border-slate-200 px-5 py-3">
+          <NotifyMembersField
+            checked={notifyMembers}
+            onCheckedChange={setNotifyMembers}
+            disabled={saving}
+          />
+        </div>
 
         <div className="p-5">
           <FilePicker
@@ -2442,13 +2610,13 @@ function UploadFilesModal({
           )}
         </div>
 
-        <footer className="flex justify-end gap-2 border-t border-[#e7e3da] px-5 py-4">
+        <footer className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
           <button
             type="button"
             onClick={
               onClose
             }
-            className="h-10 rounded-xl border border-[#ddd9cf] px-4 text-sm font-bold text-[#656159]"
+            className="h-10 rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-600"
           >
             Annuler
           </button>
@@ -2460,7 +2628,7 @@ function UploadFilesModal({
               files.length ===
                 0
             }
-            className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#687a5e] px-4 text-sm font-bold text-white disabled:opacity-50"
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-bold text-white disabled:opacity-50"
           >
             {saving ? (
               <LoaderCircle

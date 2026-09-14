@@ -9,10 +9,7 @@ export default async function CalendarPage() {
 
   return (
     <main>
-      <DashboardHeader
-        title="Calendrier"
-        description="Retrouvez les dates et rendez-vous de la chorale."
-      />
+      <DashboardHeader title="Calendrier" />
 
       <CalendarClient canManage={canManage} />
     </main>
