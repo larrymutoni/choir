@@ -627,12 +627,23 @@ export async function deleteCustomRole(
   const usage =
     await env.DB.prepare(
       `
-      SELECT COUNT(*) AS count
-      FROM users
-      WHERE custom_role_id = ?
+      SELECT
+        (
+          SELECT COUNT(*)
+          FROM users
+          WHERE custom_role_id = ?
+        ) +
+        (
+          SELECT COUNT(*)
+          FROM members
+          WHERE assigned_custom_role_id = ?
+        ) AS count
       `,
     )
-      .bind(body.id)
+      .bind(
+        body.id,
+        body.id,
+      )
       .first<{
         count: number;
       }>();

@@ -59,6 +59,7 @@ import {
   listMembers,
   rejectMemberUser,
   updateMember,
+  updateMemberPlannedRole,
 } from "./members";
 
 import {
@@ -212,6 +213,17 @@ export default {
 
       if (request.method === "PATCH" && url.pathname === "/v1/members") {
         return updateMember(request, env);
+      }
+
+      if (
+        request.method === "PATCH" &&
+        url.pathname ===
+          "/v1/members/planned-role"
+      ) {
+        return updateMemberPlannedRole(
+          request,
+          env,
+        );
       }
 
       if (request.method === "DELETE" && url.pathname === "/v1/members") {

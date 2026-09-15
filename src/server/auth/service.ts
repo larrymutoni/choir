@@ -10,6 +10,11 @@ import {
   updateUserProfile as updateUserProfileRecord,
 } from "@/server/auth/repository";
 
+import {
+  listMemberEntries,
+  updateMemberAccountRole,
+} from "@/server/members/repository";
+
 export type RegisterInput = {
   firstname: string;
   lastname: string;
@@ -32,6 +37,20 @@ export async function registerUser(input: RegisterInput) {
 
   const authorized = await isEmailAuthorized(email);
 
+  const plannedMember =
+    authorized
+      ? (
+          await listMemberEntries()
+        ).find(
+          (member) =>
+            member.membershipId &&
+            member.email
+              .trim()
+              .toLowerCase() ===
+              email,
+        ) ?? null
+      : null;
+
   const passwordHash = await bcrypt.hash(input.password, 12);
   const status = authorized ? "active" : "pending";
   const id = crypto.randomUUID();
@@ -46,6 +65,34 @@ export async function registerUser(input: RegisterInput) {
     role: "member",
     status,
   });
+
+  if (plannedMember) {
+    if (
+      plannedMember
+        .customRoleId
+    ) {
+      await updateMemberAccountRole(
+        id,
+        {
+          kind: "custom",
+
+          customRoleId:
+            plannedMember
+              .customRoleId,
+        },
+      );
+    } else {
+      await updateMemberAccountRole(
+        id,
+        {
+          kind: "system",
+
+          role:
+            plannedMember.role,
+        },
+      );
+    }
+  }
 
   if (status === "active") {
     await createUserSession(id);
