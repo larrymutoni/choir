@@ -127,13 +127,21 @@ export async function listMembers(
             members.phone
           ) AS phone,
 
-          COALESCE(
-            roles.name,
-            'member'
-          ) AS role,
+          CASE
+            WHEN users.id IS NOT NULL
+              THEN roles.name
+            ELSE COALESCE(
+              members.assigned_role,
+              'member'
+            )
+          END AS role,
 
-          users.custom_role_id
-            AS custom_role_id,
+          CASE
+            WHEN users.id IS NOT NULL
+              THEN users.custom_role_id
+            ELSE
+              members.assigned_custom_role_id
+          END AS custom_role_id,
 
           custom_roles.name
             AS custom_role_name,
@@ -154,7 +162,12 @@ export async function listMembers(
 
         LEFT JOIN custom_roles
           ON custom_roles.id =
-             users.custom_role_id
+             CASE
+               WHEN users.id IS NOT NULL
+                 THEN users.custom_role_id
+               ELSE
+                 members.assigned_custom_role_id
+             END
 
         UNION ALL
 
@@ -208,6 +221,167 @@ export async function listMembers(
   return json({
     members:
       result.results,
+  });
+}
+
+export async function updateMemberPlannedRole(
+  request: Request,
+  env: Env,
+) {
+  const body =
+    await readJson<{
+      memberId?: string;
+
+      kind?:
+        | "system"
+        | "custom";
+
+      role?:
+        | "member"
+        | "admin"
+        | "super_admin";
+
+      customRoleId?: string;
+    }>(request);
+
+  if (
+    !body.memberId ||
+    !body.kind
+  ) {
+    return json(
+      {
+        error:
+          "Member ID and role are required",
+      },
+      400,
+    );
+  }
+
+  const member =
+    await env.DB.prepare(
+      `
+      SELECT id
+      FROM members
+      WHERE id = ?
+      LIMIT 1
+      `,
+    )
+      .bind(body.memberId)
+      .first<{
+        id: string;
+      }>();
+
+  if (!member) {
+    return json(
+      {
+        error:
+          "Member not found",
+      },
+      404,
+    );
+  }
+
+  const now =
+    new Date().toISOString();
+
+  if (
+    body.kind ===
+    "system"
+  ) {
+    if (
+      !body.role ||
+      ![
+        "member",
+        "admin",
+        "super_admin",
+      ].includes(body.role)
+    ) {
+      return json(
+        {
+          error:
+            "Invalid system role",
+        },
+        400,
+      );
+    }
+
+    await env.DB.prepare(
+      `
+      UPDATE members
+      SET
+        assigned_role = ?,
+        assigned_custom_role_id = NULL,
+        updated_at = ?
+      WHERE id = ?
+      `,
+    )
+      .bind(
+        body.role,
+        now,
+        body.memberId,
+      )
+      .run();
+
+    return json({
+      ok: true,
+    });
+  }
+
+  if (!body.customRoleId) {
+    return json(
+      {
+        error:
+          "Custom role ID required",
+      },
+      400,
+    );
+  }
+
+  const customRole =
+    await env.DB.prepare(
+      `
+      SELECT id
+      FROM custom_roles
+      WHERE id = ?
+      LIMIT 1
+      `,
+    )
+      .bind(
+        body.customRoleId,
+      )
+      .first<{
+        id: string;
+      }>();
+
+  if (!customRole) {
+    return json(
+      {
+        error:
+          "Custom role not found",
+      },
+      404,
+    );
+  }
+
+  await env.DB.prepare(
+    `
+    UPDATE members
+    SET
+      assigned_role = 'member',
+      assigned_custom_role_id = ?,
+      updated_at = ?
+    WHERE id = ?
+    `,
+  )
+    .bind(
+      body.customRoleId,
+      now,
+      body.memberId,
+    )
+    .run();
+
+  return json({
+    ok: true,
   });
 }
 

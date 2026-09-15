@@ -127,6 +127,11 @@ export async function GET() {
       canManage: true,
 
       canManageRoles:
+        session.role === "admin" ||
+        session.role ===
+          "super_admin",
+
+      canManageSuperAdminRoles:
         session.role ===
         "super_admin",
 

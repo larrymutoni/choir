@@ -367,6 +367,11 @@ export function MemberDirectory() {
   ] = useState(false);
 
   const [
+    canManageSuperAdminRoles,
+    setCanManageSuperAdminRoles,
+  ] = useState(false);
+
+  const [
     currentUserId,
     setCurrentUserId,
   ] = useState("");
@@ -491,7 +496,7 @@ export function MemberDirectory() {
     try {
       const response =
         await fetch(
-          "/api/admin/roles",
+          "/api/admin/role-options",
           {
             cache:
               "no-store",
@@ -572,6 +577,9 @@ export function MemberDirectory() {
           canManageRoles:
             boolean;
 
+          canManageSuperAdminRoles:
+            boolean;
+
           currentUserId:
             string;
         };
@@ -586,6 +594,10 @@ export function MemberDirectory() {
 
       setCanManageRoles(
         data.canManageRoles,
+      );
+
+      setCanManageSuperAdminRoles(
+        data.canManageSuperAdminRoles,
       );
 
       setCurrentUserId(
@@ -828,7 +840,11 @@ export function MemberDirectory() {
     }
 
     if (canManageRoles) {
-      return true;
+      return (
+        canManageSuperAdminRoles ||
+        member.role !==
+          "super_admin"
+      );
     }
 
     return (
@@ -931,8 +947,17 @@ export function MemberDirectory() {
 
       if (
         editing &&
-        editingMember?.userId &&
+        editingMember &&
+        (
+          editingMember.userId ||
+          editingMember.membershipId
+        ) &&
         canManageRoles &&
+        (
+          canManageSuperAdminRoles ||
+          editingMember.role !==
+            "super_admin"
+        ) &&
         editingMember.userId !==
           currentUserId &&
         form.roleAssignment !==
@@ -945,9 +970,27 @@ export function MemberDirectory() {
             form.roleAssignment,
           );
 
+        const roleEndpoint =
+          editingMember.userId
+            ? "/api/admin/member-role"
+            : "/api/admin/member-planned-role";
+
+        const roleTarget =
+          editingMember.userId
+            ? {
+                userId:
+                  editingMember
+                    .userId,
+              }
+            : {
+                memberId:
+                  editingMember
+                    .membershipId,
+              };
+
         const roleResponse =
           await fetch(
-            "/api/admin/member-role",
+            roleEndpoint,
             {
               method:
                 "PATCH",
@@ -959,10 +1002,7 @@ export function MemberDirectory() {
 
               body:
                 JSON.stringify({
-                  userId:
-                    editingMember
-                      .userId,
-
+                  ...roleTarget,
                   ...assignment,
                 }),
             },
@@ -2385,8 +2425,13 @@ export function MemberDirectory() {
                   />
                 </label>
 
-                {editingMember?.userId &&
-                  canManageRoles && (
+                {editingMember &&
+                  (editingMember.userId ||
+                    editingMember.membershipId) &&
+                  canManageRoles &&
+                  (canManageSuperAdminRoles ||
+                    editingMember.role !==
+                      "super_admin") && (
                   <label className="block">
                     <span className="mb-1.5 block text-xs font-semibold text-slate-600">
                       Rôle
@@ -2402,6 +2447,10 @@ export function MemberDirectory() {
                           .userId ===
                           currentUserId ||
                         (
+                          Boolean(
+                            editingMember
+                              .userId,
+                          ) &&
                           editingMember
                             .role ===
                             "super_admin" &&
@@ -2423,7 +2472,14 @@ export function MemberDirectory() {
                       }
                       className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-400"
                     >
-                      {roleChoices.map(
+                      {roleChoices
+                        .filter(
+                          (role) =>
+                            canManageSuperAdminRoles ||
+                            role.value !==
+                              "system:super_admin",
+                        )
+                        .map(
                         (role) => (
                           <option
                             key={
@@ -2450,6 +2506,8 @@ export function MemberDirectory() {
                     )}
 
                     {editingMember
+                        .userId &&
+                      editingMember
                         .role ===
                         "super_admin" &&
                       superAdminCount <=

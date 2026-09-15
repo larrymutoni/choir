@@ -250,6 +250,26 @@ export async function updateMemberAccountRole(
   });
 }
 
+export async function updateMemberPlannedRole(
+  memberId: string,
+  assignment: RoleAssignment,
+) {
+  return dbRequest<{
+    ok: true;
+  }>(
+    "/v1/members/planned-role",
+    {
+      method: "PATCH",
+
+      body:
+        JSON.stringify({
+          memberId,
+          ...assignment,
+        }),
+    },
+  );
+}
+
 export async function importMembers(
   members:
     MemberFormInput[],

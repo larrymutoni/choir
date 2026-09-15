@@ -14,7 +14,7 @@ import {
 
 import {
   listMemberEntries,
-  updateMemberAccountRole,
+  updateMemberPlannedRole,
 } from "@/server/members/repository";
 
 const schema =
@@ -22,7 +22,7 @@ const schema =
     "kind",
     [
       z.object({
-        userId:
+        memberId:
           z.string().min(1),
 
         kind:
@@ -39,7 +39,7 @@ const schema =
       }),
 
       z.object({
-        userId:
+        memberId:
           z.string().min(1),
 
         kind:
@@ -83,7 +83,8 @@ export async function PATCH(
   ) {
     return NextResponse.json(
       {
-        message: "Forbidden.",
+        message:
+          "Forbidden.",
       },
       {
         status: 403,
@@ -110,21 +111,6 @@ export async function PATCH(
     );
   }
 
-  if (
-    parsed.data.userId ===
-    session.user_id
-  ) {
-    return NextResponse.json(
-      {
-        message:
-          "Vous ne pouvez pas modifier votre propre rôle.",
-      },
-      {
-        status: 400,
-      },
-    );
-  }
-
   try {
     const members =
       await listMemberEntries();
@@ -132,8 +118,8 @@ export async function PATCH(
     const target =
       members.find(
         (member) =>
-          member.userId ===
-          parsed.data.userId,
+          member.membershipId ===
+          parsed.data.memberId,
       );
 
     if (!target) {
@@ -148,8 +134,21 @@ export async function PATCH(
       );
     }
 
+    if (target.userId) {
+      return NextResponse.json(
+        {
+          message:
+            "Ce membre possède déjà un compte.",
+        },
+        {
+          status: 409,
+        },
+      );
+    }
+
     if (
-      session.role === "admin"
+      session.role ===
+      "admin"
     ) {
       if (
         target.role ===
@@ -158,7 +157,7 @@ export async function PATCH(
         return NextResponse.json(
           {
             message:
-              "Seul un super administrateur peut modifier le rôle d’un super administrateur.",
+              "Seul un super administrateur peut modifier ce rôle.",
           },
           {
             status: 403,
@@ -188,8 +187,8 @@ export async function PATCH(
       parsed.data.kind ===
       "system"
     ) {
-      await updateMemberAccountRole(
-        parsed.data.userId,
+      await updateMemberPlannedRole(
+        parsed.data.memberId,
         {
           kind: "system",
           role:
@@ -197,8 +196,8 @@ export async function PATCH(
         },
       );
     } else {
-      await updateMemberAccountRole(
-        parsed.data.userId,
+      await updateMemberPlannedRole(
+        parsed.data.memberId,
         {
           kind: "custom",
           customRoleId:
@@ -213,7 +212,7 @@ export async function PATCH(
     });
   } catch (error) {
     console.error(
-      "Member role PATCH:",
+      "Planned member role PATCH:",
       error,
     );
 
