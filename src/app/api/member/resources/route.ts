@@ -1,3 +1,4 @@
+import { hasRolePermission } from "@/lib/permissions";
 import {
   NextResponse,
 } from "next/server";
@@ -11,11 +12,13 @@ import {
 } from "@/server/resources/repository";
 
 function canManage(
-  role: string,
+  session: Parameters<
+    typeof hasRolePermission
+  >[0],
 ) {
-  return (
-    role === "admin" ||
-    role === "super_admin"
+  return hasRolePermission(
+    session,
+    "resources",
   );
 }
 
@@ -37,9 +40,7 @@ export async function GET() {
 
   try {
     const management =
-      canManage(
-        session.role,
-      );
+      canManage(session);
 
     const resources =
       await listResources(

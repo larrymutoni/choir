@@ -1,3 +1,4 @@
+import { hasRolePermission } from "@/lib/permissions";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -22,8 +23,15 @@ const importSchema = z.object({
   events: z.array(eventSchema).min(1).max(200),
 });
 
-function canManage(role: string) {
-  return role === "admin" || role === "super_admin";
+function canManage(
+  session: Parameters<
+    typeof hasRolePermission
+  >[0],
+) {
+  return hasRolePermission(
+    session,
+    "calendar",
+  );
 }
 
 export async function POST(request: Request) {
@@ -40,7 +48,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!canManage(session.role)) {
+  if (!canManage(session)) {
     return NextResponse.json(
       {
         message: "Forbidden.",

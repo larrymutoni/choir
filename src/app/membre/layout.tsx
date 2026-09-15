@@ -1,7 +1,18 @@
-import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { getDashboardNavigation } from "@/lib/dashboard-navigation";
-import { getAccountProfile } from "@/server/auth/account";
-import { requireUser } from "@/server/auth/guard";
+import {
+  DashboardShell,
+} from "@/components/dashboard/DashboardShell";
+
+import {
+  getDashboardNavigation,
+} from "@/lib/dashboard-navigation";
+
+import {
+  getAccountProfile,
+} from "@/server/auth/account";
+
+import {
+  requireUser,
+} from "@/server/auth/guard";
 
 export default async function MemberLayout({
   children,
@@ -19,6 +30,7 @@ export default async function MemberLayout({
   const links =
     getDashboardNavigation(
       session.role,
+      session.permissions,
     );
 
   return (

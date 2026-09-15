@@ -1,9 +1,29 @@
-import { ResourcesLibrary } from "@/components/resources/ResourcesLibrary";
+import { redirect } from "next/navigation";
 
-import { requireUser } from "@/server/auth/guard";
+import {
+  ResourcesLibrary,
+} from "@/components/resources/ResourcesLibrary";
+
+import {
+  hasRolePermission,
+} from "@/lib/permissions";
+
+import {
+  requireUser,
+} from "@/server/auth/guard";
 
 export default async function ResourcesPage() {
-  await requireUser();
+  const user =
+    await requireUser();
+
+  if (
+    !hasRolePermission(
+      user,
+      "resources",
+    )
+  ) {
+    redirect("/membre");
+  }
 
   return <ResourcesLibrary />;
 }

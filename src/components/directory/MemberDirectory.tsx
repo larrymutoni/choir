@@ -33,6 +33,10 @@ import {
 } from "@/components/directory/MemberImportDialog";
 
 import {
+  RoleManagementModal,
+} from "@/components/directory/RoleManagementModal";
+
+import {
   showToast,
 } from "@/lib/toast";
 
@@ -58,7 +62,17 @@ type MemberEntry = {
   phone: string | null;
 
   role: Role;
-  accountStatus: AccountStatus;
+
+  customRoleId:
+    string | null;
+
+  customRoleName:
+    string | null;
+
+  roleName: string;
+
+  accountStatus:
+    AccountStatus;
 
   isOfficial: boolean;
 };
@@ -71,14 +85,19 @@ type StatusFilter =
   | "rejected";
 
 type RoleFilter =
-  | "all"
-  | Role;
+  string;
+
+type RoleChoice = {
+  value: string;
+  label: string;
+};
 
 type MemberForm = {
   firstname: string;
   lastname: string;
   email: string;
   phone: string;
+  roleAssignment: string;
 };
 
 const emptyForm: MemberForm = {
@@ -86,6 +105,8 @@ const emptyForm: MemberForm = {
   lastname: "",
   email: "",
   phone: "",
+  roleAssignment:
+    "system:member",
 };
 
 const PAGE_SIZE = 10;
@@ -130,20 +151,87 @@ function fullName(
 }
 
 function roleLabel(
-  role: Role,
+  member: MemberEntry,
 ) {
   if (
-    role === "super_admin"
+    member.customRoleName
+  ) {
+    return member.customRoleName;
+  }
+
+  if (
+    member.role ===
+    "super_admin"
   ) {
     return "Super administrateur";
   }
 
-  if (role === "admin") {
+  if (
+    member.role ===
+    "admin"
+  ) {
     return "Administrateur";
   }
 
   return "Membre";
 }
+
+function memberRoleValue(
+  member: MemberEntry,
+) {
+  if (
+    member.customRoleId
+  ) {
+    return `custom:${member.customRoleId}`;
+  }
+
+  return `system:${member.role}`;
+}
+
+function roleAssignmentBody(
+  value: string,
+) {
+  if (
+    value.startsWith(
+      "custom:",
+    )
+  ) {
+    return {
+      kind:
+        "custom" as const,
+
+      customRoleId:
+        value.slice(
+          "custom:".length,
+        ),
+    };
+  }
+
+  return {
+    kind:
+      "system" as const,
+
+    role:
+      value.slice(
+        "system:".length,
+      ) as Role,
+  };
+}
+
+function roleClasses(
+  role: Role,
+) {
+  if (role === "super_admin") {
+    return "bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-600/10";
+  }
+
+  if (role === "admin") {
+    return "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/10";
+  }
+
+  return "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-500/10";
+}
+
 
 function statusOf(
   member: MemberEntry,
@@ -284,6 +372,31 @@ export function MemberDirectory() {
   ] = useState("");
 
   const [
+    roleChoices,
+    setRoleChoices,
+  ] =
+    useState<RoleChoice[]>([
+      {
+        value:
+          "system:member",
+        label:
+          "Membre",
+      },
+      {
+        value:
+          "system:admin",
+        label:
+          "Administrateur",
+      },
+      {
+        value:
+          "system:super_admin",
+        label:
+          "Super administrateur",
+      },
+    ]);
+
+  const [
     search,
     setSearch,
   ] = useState("");
@@ -331,6 +444,11 @@ export function MemberDirectory() {
   ] = useState(false);
 
   const [
+    rolesOpen,
+    setRolesOpen,
+  ] = useState(false);
+
+  const [
     formOpen,
     setFormOpen,
   ] = useState(false);
@@ -368,6 +486,59 @@ export function MemberDirectory() {
     useState<string | null>(
       null,
     );
+
+  async function loadRoleChoices() {
+    try {
+      const response =
+        await fetch(
+          "/api/admin/roles",
+          {
+            cache:
+              "no-store",
+          },
+        );
+
+      if (!response.ok) {
+        return;
+      }
+
+      const data =
+        (await response.json()) as {
+          systemRoles: Array<{
+            id: Role;
+            name: string;
+          }>;
+
+          roles: Array<{
+            id: string;
+            name: string;
+          }>;
+        };
+
+      setRoleChoices([
+        ...data.systemRoles.map(
+          (role) => ({
+            value:
+              `system:${role.id}`,
+            label:
+              role.name,
+          }),
+        ),
+
+        ...data.roles.map(
+          (role) => ({
+            value:
+              `custom:${role.id}`,
+            label:
+              role.name,
+          }),
+        ),
+      ]);
+    } catch {
+      // Member list remains usable
+      // even if role options fail.
+    }
+  }
 
   async function loadMembers() {
     setLoading(true);
@@ -465,6 +636,12 @@ export function MemberDirectory() {
     void loadMembers();
   }, []);
 
+  useEffect(() => {
+    if (canManageRoles) {
+      void loadRoleChoices();
+    }
+  }, [canManageRoles]);
+
   const counts =
     useMemo(() => {
       const result = {
@@ -484,6 +661,62 @@ export function MemberDirectory() {
       }
 
       return result;
+    }, [members]);
+
+  const superAdminCount =
+    useMemo(
+      () =>
+        members.filter(
+          (member) =>
+            member.userId &&
+            member.role ===
+              "super_admin",
+        ).length,
+      [members],
+    );
+
+
+  const roleFilterOptions =
+    useMemo(() => {
+      const values =
+        new Map<
+          string,
+          string
+        >();
+
+      for (
+        const member of
+        members
+      ) {
+        values.set(
+          memberRoleValue(
+            member,
+          ),
+          roleLabel(
+            member,
+          ),
+        );
+      }
+
+      return Array.from(
+        values.entries(),
+      )
+        .map(
+          ([
+            value,
+            label,
+          ]) => ({
+            value,
+            label,
+          }),
+        )
+        .sort(
+          (left, right) =>
+            left.label.localeCompare(
+              right.label,
+              "fr",
+            ),
+        );
     }, [members]);
 
   const filteredMembers =
@@ -509,8 +742,9 @@ export function MemberDirectory() {
           if (
             roleFilter !==
               "all" &&
-            member.role !==
-              roleFilter
+            memberRoleValue(
+              member,
+            ) !== roleFilter
           ) {
             return false;
           }
@@ -525,9 +759,7 @@ export function MemberDirectory() {
               member.lastname,
               member.email,
               member.phone ?? "",
-              roleLabel(
-                member.role,
-              ),
+              roleLabel(member),
             ]
               .join(" ")
               .toLocaleLowerCase(
@@ -654,6 +886,11 @@ export function MemberDirectory() {
 
       phone:
         member.phone ?? "",
+
+      roleAssignment:
+        memberRoleValue(
+          member,
+        ),
     });
 
     setMenuMemberId(null);
@@ -691,6 +928,56 @@ export function MemberDirectory() {
           editingMember
             ?.membershipId,
         );
+
+      if (
+        editing &&
+        editingMember?.userId &&
+        canManageRoles &&
+        editingMember.userId !==
+          currentUserId &&
+        form.roleAssignment !==
+          memberRoleValue(
+            editingMember,
+          )
+      ) {
+        const assignment =
+          roleAssignmentBody(
+            form.roleAssignment,
+          );
+
+        const roleResponse =
+          await fetch(
+            "/api/admin/member-role",
+            {
+              method:
+                "PATCH",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body:
+                JSON.stringify({
+                  userId:
+                    editingMember
+                      .userId,
+
+                  ...assignment,
+                }),
+            },
+          );
+
+        if (
+          !roleResponse.ok
+        ) {
+          throw new Error(
+            await responseError(
+              roleResponse,
+            ),
+          );
+        }
+      }
 
       const response =
         await fetch(
@@ -840,74 +1127,6 @@ export function MemberDirectory() {
     }
   }
 
-  async function changeRole(
-    member: MemberEntry,
-    role: Role,
-  ) {
-    if (
-      !member.userId ||
-      !canManageRoles ||
-      member.userId ===
-        currentUserId ||
-      role === member.role
-    ) {
-      return;
-    }
-
-    setAccountAction(
-      `role:${member.userId}`,
-    );
-
-    try {
-      const response =
-        await fetch(
-          "/api/member/members",
-          {
-            method: "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify({
-                action:
-                  "change_role",
-
-                userId:
-                  member.userId,
-
-                role,
-              }),
-          },
-        );
-
-      if (!response.ok) {
-        throw new Error(
-          await responseError(
-            response,
-          ),
-        );
-      }
-
-      await loadMembers();
-
-      showToast(
-        "Rôle modifié",
-      );
-    } catch (cause) {
-      showToast(
-        cause instanceof Error
-          ? cause.message
-          : "Impossible de modifier le rôle.",
-        "error",
-      );
-    } finally {
-      setAccountAction(null);
-    }
-  }
-
   async function removeMember(
     member: MemberEntry,
   ) {
@@ -1001,6 +1220,20 @@ export function MemberDirectory() {
 
           {canManage && (
             <div className="flex items-center gap-2">
+              {canManageRoles && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setRolesOpen(true)
+                  }
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3.5 text-sm font-semibold text-violet-700 shadow-sm transition hover:bg-violet-100"
+                >
+                  <ShieldCheck
+                    size={16}
+                  />
+                  Gérer les rôles
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() =>
@@ -1241,15 +1474,23 @@ export function MemberDirectory() {
               <option value="all">
                 Tous les rôles
               </option>
-              <option value="member">
-                Membres
-              </option>
-              <option value="admin">
-                Administrateurs
-              </option>
-              <option value="super_admin">
-                Super administrateurs
-              </option>
+
+              {roleFilterOptions.map(
+                (role) => (
+                  <option
+                    key={
+                      role.value
+                    }
+                    value={
+                      role.value
+                    }
+                  >
+                    {
+                      role.label
+                    }
+                  </option>
+                ),
+              )}
             </select>
           </div>
 
@@ -1424,11 +1665,20 @@ export function MemberDirectory() {
                         </div>
 
                         <div className="mt-3 flex items-center gap-2 lg:mt-0">
-                          <span className="text-xs font-medium text-slate-600">
-                            {roleLabel(
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${roleClasses(
                               member.role,
-                            )}
+                            )}`}
+                          >
+                            {roleLabel(member)}
                           </span>
+
+                          {member.userId ===
+                            currentUserId && (
+                            <span className="text-[11px] font-medium text-slate-400">
+                              Vous
+                            </span>
+                          )}
                         </div>
 
                         <div className="mt-2 lg:mt-0">
@@ -1752,11 +2002,13 @@ export function MemberDirectory() {
                       )}
                     </h2>
 
-                    <p className="mt-0.5 text-sm text-slate-500">
-                      {roleLabel(
+                    <span
+                      className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${roleClasses(
                         selected.role,
-                      )}
-                    </p>
+                      )}`}
+                    >
+                      {roleLabel(selected)}
+                    </span>
                   </div>
 
                   <span
@@ -1885,47 +2137,17 @@ export function MemberDirectory() {
                   </h3>
                 </div>
 
-                {canManageRoles &&
-                selected.userId &&
-                selected.userId !==
-                  currentUserId ? (
-                  <select
-                    value={
-                      selected.role
-                    }
-                    disabled={
-                      accountAction !==
-                      null
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      void changeRole(
-                        selected,
-                        event
-                          .target
-                          .value as Role,
-                      )
-                    }
-                    className="mt-3 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-blue-500"
-                  >
-                    <option value="member">
-                      Membre
-                    </option>
-                    <option value="admin">
-                      Administrateur
-                    </option>
-                    <option value="super_admin">
-                      Super administrateur
-                    </option>
-                  </select>
-                ) : (
-                  <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-700">
-                    {roleLabel(
+                <div className="mt-3">
+                  <span
+                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${roleClasses(
                       selected.role,
+                    )}`}
+                  >
+                    {roleLabel(
+                      selected,
                     )}
-                  </div>
-                )}
+                  </span>
+                </div>
               </section>
             </div>
 
@@ -2162,6 +2384,85 @@ export function MemberDirectory() {
                     className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                   />
                 </label>
+
+                {editingMember?.userId &&
+                  canManageRoles && (
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-semibold text-slate-600">
+                      Rôle
+                    </span>
+
+                    <select
+                      value={
+                        form.roleAssignment
+                      }
+                      disabled={
+                        saving ||
+                        editingMember
+                          .userId ===
+                          currentUserId ||
+                        (
+                          editingMember
+                            .role ===
+                            "super_admin" &&
+                          superAdminCount <=
+                            1
+                        )
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setForm({
+                          ...form,
+
+                          roleAssignment:
+                            event
+                              .target
+                              .value,
+                        })
+                      }
+                      className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-400"
+                    >
+                      {roleChoices.map(
+                        (role) => (
+                          <option
+                            key={
+                              role.value
+                            }
+                            value={
+                              role.value
+                            }
+                          >
+                            {
+                              role.label
+                            }
+                          </option>
+                        ),
+                      )}
+                    </select>
+
+                    {editingMember
+                      .userId ===
+                      currentUserId && (
+                      <p className="mt-1.5 text-xs text-slate-500">
+                        Vous ne pouvez pas modifier votre propre rôle.
+                      </p>
+                    )}
+
+                    {editingMember
+                        .role ===
+                        "super_admin" &&
+                      superAdminCount <=
+                        1 &&
+                      editingMember
+                        .userId !==
+                        currentUserId && (
+                        <p className="mt-1.5 text-xs text-amber-700">
+                          Le dernier super administrateur doit conserver ce rôle.
+                        </p>
+                      )}
+                  </label>
+                )}
               </div>
 
               <footer className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
@@ -2194,6 +2495,17 @@ export function MemberDirectory() {
           </div>
         </div>
       )}
+
+      <RoleManagementModal
+        open={rolesOpen}
+        onClose={() =>
+          setRolesOpen(false)
+        }
+        onChanged={() => {
+          void loadRoleChoices();
+          void loadMembers();
+        }}
+      />
 
       <MemberImportDialog
         open={importOpen}

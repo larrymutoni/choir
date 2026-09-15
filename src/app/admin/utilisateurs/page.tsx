@@ -1,11 +1,15 @@
-import { MemberDirectory } from "@/components/directory/MemberDirectory";
-import { requireRole } from "@/server/auth/guard";
+import {
+  MemberDirectory,
+} from "@/components/directory/MemberDirectory";
+
+import {
+  requirePermission,
+} from "@/lib/auth";
 
 export default async function UsersPage() {
-  await requireRole([
-    "admin",
-    "super_admin",
-  ]);
+  await requirePermission(
+    "members",
+  );
 
   return <MemberDirectory />;
 }

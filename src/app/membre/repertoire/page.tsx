@@ -1,15 +1,26 @@
 import { redirect } from "next/navigation";
 
-import { requireUser } from "@/server/auth/guard";
+import {
+  hasRolePermission,
+} from "@/lib/permissions";
+
+import {
+  requireUser,
+} from "@/server/auth/guard";
 
 export default async function MemberDirectoryPage() {
-  const user = await requireUser();
+  const user =
+    await requireUser();
 
   if (
-    user.role === "admin" ||
-    user.role === "super_admin"
+    hasRolePermission(
+      user,
+      "members",
+    )
   ) {
-    redirect("/admin/utilisateurs");
+    redirect(
+      "/admin/utilisateurs",
+    );
   }
 
   redirect("/membre");

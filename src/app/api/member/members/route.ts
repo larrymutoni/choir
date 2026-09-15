@@ -1,3 +1,4 @@
+import { hasRolePermission } from "@/lib/permissions";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -61,11 +62,13 @@ const roleSchema = z.object({
 });
 
 function canManage(
-  role: string,
+  session: Parameters<
+    typeof hasRolePermission
+  >[0],
 ) {
-  return (
-    role === "admin" ||
-    role === "super_admin"
+  return hasRolePermission(
+    session,
+    "members",
   );
 }
 
@@ -102,9 +105,7 @@ export async function GET() {
   }
 
   if (
-    !canManage(
-      session.role,
-    )
+    !canManage(session)
   ) {
     return NextResponse.json(
       {
@@ -169,9 +170,7 @@ export async function POST(
   }
 
   if (
-    !canManage(
-      session.role,
-    )
+    !canManage(session)
   ) {
     return NextResponse.json(
       {
@@ -325,9 +324,7 @@ export async function PATCH(
   }
 
   if (
-    !canManage(
-      session.role,
-    )
+    !canManage(session)
   ) {
     return NextResponse.json(
       {
@@ -389,8 +386,13 @@ export async function PATCH(
     }
 
     if (
-      session.role === "admin" &&
-      target.role !== "member"
+      session.role !== "super_admin" &&
+      (
+        target.role !== "member" ||
+        Boolean(
+          target.customRoleId,
+        )
+      )
     ) {
       return NextResponse.json(
         {
@@ -442,9 +444,7 @@ export async function DELETE(
   }
 
   if (
-    !canManage(
-      session.role,
-    )
+    !canManage(session)
   ) {
     return NextResponse.json(
       {
@@ -520,8 +520,13 @@ export async function DELETE(
     }
 
     if (
-      session.role === "admin" &&
-      target.role !== "member"
+      session.role !== "super_admin" &&
+      (
+        target.role !== "member" ||
+        Boolean(
+          target.customRoleId,
+        )
+      )
     ) {
       return NextResponse.json(
         {

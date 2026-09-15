@@ -1,3 +1,4 @@
+import { hasRolePermission } from "@/lib/permissions";
 import { NextResponse } from "next/server";
 
 import { getCurrentSession } from "@/server/auth/session";
@@ -7,8 +8,15 @@ export const runtime = "nodejs";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-function canManage(role: string) {
-  return role === "admin" || role === "super_admin";
+function canManage(
+  session: Parameters<
+    typeof hasRolePermission
+  >[0],
+) {
+  return hasRolePermission(
+    session,
+    "calendar",
+  );
 }
 
 export async function POST(request: Request) {
@@ -25,7 +33,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!canManage(session.role)) {
+  if (!canManage(session)) {
     return NextResponse.json(
       {
         message: "Forbidden.",

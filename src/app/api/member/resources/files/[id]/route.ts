@@ -1,3 +1,4 @@
+import { hasRolePermission } from "@/lib/permissions";
 import { NextResponse } from "next/server";
 
 import { getCurrentSession } from "@/server/auth/session";
@@ -9,8 +10,15 @@ import {
 
 export const runtime = "nodejs";
 
-function canManage(role: string) {
-  return role === "admin" || role === "super_admin";
+function canManage(
+  session: Parameters<
+    typeof hasRolePermission
+  >[0],
+) {
+  return hasRolePermission(
+    session,
+    "resources",
+  );
 }
 
 export async function GET(
@@ -53,7 +61,7 @@ export async function GET(
 
       resourceId: id,
 
-      canManage: canManage(session.role),
+      canManage: canManage(session),
     });
 
     const workerUrl = getResourceWorkerUrl();

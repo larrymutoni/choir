@@ -98,6 +98,8 @@ export async function listMembers(
         email,
         phone,
         role,
+        custom_role_id,
+        custom_role_name,
         account_status,
         is_official
       FROM (
@@ -130,6 +132,12 @@ export async function listMembers(
             'member'
           ) AS role,
 
+          users.custom_role_id
+            AS custom_role_id,
+
+          custom_roles.name
+            AS custom_role_name,
+
           users.status AS account_status,
 
           1 AS is_official
@@ -144,6 +152,10 @@ export async function listMembers(
           ON roles.id =
              users.role_id
 
+        LEFT JOIN custom_roles
+          ON custom_roles.id =
+             users.custom_role_id
+
         UNION ALL
 
         SELECT
@@ -155,7 +167,15 @@ export async function listMembers(
           users.lastname AS lastname,
           users.email AS email,
           users.phone AS phone,
+
           roles.name AS role,
+
+          users.custom_role_id
+            AS custom_role_id,
+
+          custom_roles.name
+            AS custom_role_name,
+
           users.status AS account_status,
 
           0 AS is_official
@@ -165,6 +185,10 @@ export async function listMembers(
         JOIN roles
           ON roles.id =
              users.role_id
+
+        LEFT JOIN custom_roles
+          ON custom_roles.id =
+             users.custom_role_id
 
         WHERE NOT EXISTS (
           SELECT 1
