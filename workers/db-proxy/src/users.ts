@@ -302,59 +302,287 @@ export async function updateUserStatus(request: Request, env: Env) {
   });
 }
 
-export async function updateUserRole(request: Request, env: Env) {
-  const body = await readJson<{
-    userId?: string;
-    role?: "member" | "admin" | "super_admin";
-  }>(request);
+export async function updateUserRole(
+  request: Request,
+  env: Env,
+) {
+  const body =
+    await readJson<{
+      userId?: string;
 
-  if (!body.userId || !body.role) {
+      kind?:
+        | "system"
+        | "custom";
+
+      role?:
+        | "member"
+        | "admin"
+        | "super_admin";
+
+      customRoleId?: string;
+    }>(request);
+
+  const kind =
+    body.kind ??
+    (
+      body.role
+        ? "system"
+        : undefined
+    );
+
+  if (
+    !body.userId ||
+    !kind
+  ) {
     return json(
       {
-        error: "User ID and role are required",
+        error:
+          "User ID and role are required",
       },
       400,
     );
   }
 
-  const role = await env.DB.prepare(
-    `
-      SELECT id
-      FROM roles
-      WHERE name = ?
+  const target =
+    await env.DB.prepare(
+      `
+      SELECT
+        users.id,
+        roles.name AS role
+      FROM users
+      JOIN roles
+        ON roles.id =
+           users.role_id
+      WHERE users.id = ?
       LIMIT 1
       `,
-  )
-    .bind(body.role)
-    .first<{
+    )
+      .bind(body.userId)
+      .first<{
+        id: string;
+        role: string;
+      }>();
+
+  if (!target) {
+    return json(
+      {
+        error:
+          "User not found",
+      },
+      404,
+    );
+  }
+
+  const assigningSuperAdmin =
+    kind === "system" &&
+    body.role ===
+      "super_admin";
+
+  if (
+    target.role ===
+      "super_admin" &&
+    !assigningSuperAdmin
+  ) {
+    const superAdmins =
+      await env.DB.prepare(
+        `
+        SELECT COUNT(*) AS count
+        FROM users
+        JOIN roles
+          ON roles.id =
+             users.role_id
+        WHERE roles.name =
+              'super_admin'
+        `,
+      ).first<{
+        count: number;
+      }>();
+
+    if (
+      Number(
+        superAdmins?.count ??
+          0,
+      ) <= 1
+    ) {
+      return json(
+        {
+          error:
+            "Le dernier super administrateur ne peut pas être rétrogradé.",
+        },
+        409,
+      );
+    }
+  }
+
+  if (
+    kind === "system"
+  ) {
+    if (
+      !body.role ||
+      ![
+        "member",
+        "admin",
+        "super_admin",
+      ].includes(body.role)
+    ) {
+      return json(
+        {
+          error:
+            "Invalid role",
+        },
+        400,
+      );
+    }
+
+    const role =
+      await env.DB.prepare(
+        `
+        SELECT id
+        FROM roles
+        WHERE name = ?
+        LIMIT 1
+        `,
+      )
+        .bind(body.role)
+        .first<{
+          id: number;
+        }>();
+
+    if (!role) {
+      return json(
+        {
+          error:
+            "Invalid role",
+        },
+        400,
+      );
+    }
+
+    const result =
+      await env.DB.prepare(
+        `
+        UPDATE users
+        SET
+          role_id = ?,
+          custom_role_id = NULL,
+          updated_at = ?
+        WHERE id = ?
+        `,
+      )
+        .bind(
+          role.id,
+          new Date()
+            .toISOString(),
+          body.userId,
+        )
+        .run();
+
+    if (
+      result.meta.changes ===
+      0
+    ) {
+      return json(
+        {
+          error:
+            "User not found",
+        },
+        404,
+      );
+    }
+
+    return json({
+      ok: true,
+    });
+  }
+
+  if (
+    !body.customRoleId
+  ) {
+    return json(
+      {
+        error:
+          "Custom role ID is required",
+      },
+      400,
+    );
+  }
+
+  const customRole =
+    await env.DB.prepare(
+      `
+      SELECT id
+      FROM custom_roles
+      WHERE id = ?
+      LIMIT 1
+      `,
+    )
+      .bind(
+        body.customRoleId,
+      )
+      .first<{
+        id: string;
+      }>();
+
+  if (!customRole) {
+    return json(
+      {
+        error:
+          "Custom role not found",
+      },
+      404,
+    );
+  }
+
+  const memberRole =
+    await env.DB.prepare(
+      `
+      SELECT id
+      FROM roles
+      WHERE name = 'member'
+      LIMIT 1
+      `,
+    ).first<{
       id: number;
     }>();
 
-  if (!role) {
+  if (!memberRole) {
     return json(
       {
-        error: "Invalid role",
+        error:
+          "Member role not found",
       },
-      400,
+      500,
     );
   }
 
-  const result = await env.DB.prepare(
-    `
+  const result =
+    await env.DB.prepare(
+      `
       UPDATE users
       SET
         role_id = ?,
+        custom_role_id = ?,
         updated_at = ?
       WHERE id = ?
       `,
-  )
-    .bind(role.id, new Date().toISOString(), body.userId)
-    .run();
+    )
+      .bind(
+        memberRole.id,
+        body.customRoleId,
+        new Date()
+          .toISOString(),
+        body.userId,
+      )
+      .run();
 
-  if (result.meta.changes === 0) {
+  if (
+    result.meta.changes ===
+    0
+  ) {
     return json(
       {
-        error: "User not found",
+        error:
+          "User not found",
       },
       404,
     );

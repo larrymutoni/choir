@@ -304,7 +304,11 @@ export function DashboardShell({
     mobile?: boolean;
     compact?: boolean;
   }) {
+    const disabled =
+      link.disabled === true;
+
     const active =
+      !disabled &&
       isActive(
         pathname,
         link.href,
@@ -313,7 +317,16 @@ export function DashboardShell({
     return (
       <Link
         href={link.href}
-        onClick={() => {
+        aria-disabled={disabled}
+        tabIndex={
+          disabled ? -1 : undefined
+        }
+        onClick={(event) => {
+          if (disabled) {
+            event.preventDefault();
+            return;
+          }
+
           if (mobile) {
             setMobileOpen(
               false,
@@ -325,17 +338,21 @@ export function DashboardShell({
           compact
             ? "min-h-9 px-3 py-1.5 text-[13px]"
             : "min-h-10 px-3 py-2 text-sm",
-          active
-            ? "bg-slate-900 font-semibold text-white shadow-sm"
-            : "font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-950",
+          disabled
+            ? "cursor-not-allowed font-medium text-slate-400 opacity-50"
+            : active
+              ? "bg-slate-900 font-semibold text-white shadow-sm"
+              : "font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-950",
         ].join(" ")}
       >
         <span
           className={[
             "shrink-0 transition",
-            active
-              ? "text-white"
-              : "text-slate-400 group-hover:text-slate-700",
+            disabled
+              ? "text-slate-300"
+              : active
+                ? "text-white"
+                : "text-slate-400 group-hover:text-slate-700",
           ].join(" ")}
         >
           <NavigationIcon

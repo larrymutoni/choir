@@ -1,7 +1,18 @@
-import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { getDashboardNavigation } from "@/lib/dashboard-navigation";
-import { getAccountProfile } from "@/server/auth/account";
-import { requireRole } from "@/server/auth/guard";
+import {
+  DashboardShell,
+} from "@/components/dashboard/DashboardShell";
+
+import {
+  getDashboardNavigation,
+} from "@/lib/dashboard-navigation";
+
+import {
+  requireAdmin,
+} from "@/lib/auth";
+
+import {
+  getAccountProfile,
+} from "@/server/auth/account";
 
 export default async function AdminLayout({
   children,
@@ -9,10 +20,7 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const session =
-    await requireRole([
-      "admin",
-      "super_admin",
-    ]);
+    await requireAdmin();
 
   const profile =
     await getAccountProfile(
@@ -22,6 +30,7 @@ export default async function AdminLayout({
   const links =
     getDashboardNavigation(
       session.role,
+      session.permissions,
     );
 
   return (

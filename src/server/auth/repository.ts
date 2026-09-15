@@ -1,4 +1,5 @@
 import { dbRequest } from "@/server/db/client";
+import type { RolePermissions } from "@/lib/permissions";
 
 export type UserStatus = "pending" | "active" | "rejected";
 export type UserRole = "member" | "admin" | "super_admin";
@@ -90,6 +91,10 @@ export type SessionUser = {
   email: string;
   status: UserStatus;
   role: UserRole;
+  custom_role_id: string | null;
+  custom_role_name: string | null;
+  role_name: string;
+  permissions: RolePermissions;
 };
 
 export async function createSessionRecord(input: {

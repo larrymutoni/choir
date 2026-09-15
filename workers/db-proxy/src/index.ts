@@ -8,6 +8,13 @@ import {
 } from "./account";
 
 import {
+  createCustomRole,
+  deleteCustomRole,
+  listCustomRoles,
+  updateCustomRole,
+} from "./roles";
+
+import {
   checkAuthorizedEmail,
   createUser,
   findUserByEmail,
@@ -336,6 +343,50 @@ export default {
 
       if (request.method === "DELETE" && url.pathname === "/v1/emails") {
         return deleteAuthorizedEmail(request, env);
+      }
+
+      /*
+       * CUSTOM ROLES
+       */
+
+      if (
+        request.method === "GET" &&
+        url.pathname === "/v1/custom-roles"
+      ) {
+        return listCustomRoles(
+          request,
+          env,
+        );
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname === "/v1/custom-roles"
+      ) {
+        return createCustomRole(
+          request,
+          env,
+        );
+      }
+
+      if (
+        request.method === "PATCH" &&
+        url.pathname === "/v1/custom-roles"
+      ) {
+        return updateCustomRole(
+          request,
+          env,
+        );
+      }
+
+      if (
+        request.method === "DELETE" &&
+        url.pathname === "/v1/custom-roles"
+      ) {
+        return deleteCustomRole(
+          request,
+          env,
+        );
       }
 
       /*

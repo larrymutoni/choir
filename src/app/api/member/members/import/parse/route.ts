@@ -1,3 +1,4 @@
+import { hasRolePermission } from "@/lib/permissions";
 import { NextResponse } from "next/server";
 
 import { getCurrentSession } from "@/server/auth/session";
@@ -12,11 +13,13 @@ const MAX_FILE_SIZE =
   10 * 1024 * 1024;
 
 function canManage(
-  role: string,
+  session: Parameters<
+    typeof hasRolePermission
+  >[0],
 ) {
-  return (
-    role === "admin" ||
-    role === "super_admin"
+  return hasRolePermission(
+    session,
+    "members",
   );
 }
 
@@ -39,9 +42,7 @@ export async function POST(
   }
 
   if (
-    !canManage(
-      session.role,
-    )
+    !canManage(session)
   ) {
     return NextResponse.json(
       {

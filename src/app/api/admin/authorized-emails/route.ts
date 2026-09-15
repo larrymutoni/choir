@@ -1,3 +1,4 @@
+import { hasRolePermission } from "@/lib/permissions";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentSession } from "@/server/auth/session";
@@ -27,7 +28,7 @@ async function requireAdmin() {
     };
   }
 
-  if (!["admin", "super_admin"].includes(session.role)) {
+  if (!hasRolePermission(session, "members")) {
     return {
       error: NextResponse.json({ message: "Forbidden." }, { status: 403 }),
     };
