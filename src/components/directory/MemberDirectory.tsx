@@ -145,7 +145,7 @@ function fullName(
   member: MemberEntry,
 ) {
   return (
-    `${member.firstname} ${member.lastname}`.trim() ||
+    `${member.lastname} ${member.firstname}`.trim() ||
     member.email
   );
 }
@@ -338,6 +338,11 @@ async function responseError(
 }
 
 export function MemberDirectory() {
+  const [
+    nameSortDirection,
+    setNameSortDirection,
+  ] = useState<"asc" | "desc">("asc");
+
   const [
     members,
     setMembers,
@@ -790,6 +795,52 @@ export function MemberDirectory() {
       roleFilter,
     ]);
 
+  const sortedMembers =
+    useMemo(
+      () =>
+        [...filteredMembers].sort(
+          (left, right) => {
+            const byLastName =
+              left.lastname.localeCompare(
+                right.lastname,
+                "fr",
+                { sensitivity: "base" },
+              );
+
+            if (byLastName !== 0) {
+              return nameSortDirection === "asc"
+                ? byLastName
+                : -byLastName;
+            }
+
+            const byFirstName =
+              left.firstname.localeCompare(
+                right.firstname,
+                "fr",
+                { sensitivity: "base" },
+              );
+
+            if (byFirstName !== 0) {
+              return nameSortDirection === "asc"
+                ? byFirstName
+                : -byFirstName;
+            }
+
+            const byEmail =
+              left.email.localeCompare(
+                right.email,
+                "fr",
+                { sensitivity: "base" },
+              );
+
+            return nameSortDirection === "asc"
+              ? byEmail
+              : -byEmail;
+          },
+        ),
+      [filteredMembers, nameSortDirection],
+    );
+
   const totalPages =
     Math.max(
       1,
@@ -800,7 +851,7 @@ export function MemberDirectory() {
     );
 
   const paginatedMembers =
-    filteredMembers.slice(
+    sortedMembers.slice(
       (currentPage - 1) *
         PAGE_SIZE,
       currentPage *
@@ -1260,7 +1311,7 @@ export function MemberDirectory() {
 
           {canManage && (
             <div className="flex items-center gap-2">
-              {canManageRoles && (
+              {canManageSuperAdminRoles && (
                 <button
                   type="button"
                   onClick={() =>
@@ -1592,7 +1643,30 @@ export function MemberDirectory() {
             <>
               <div className="hidden grid-cols-[minmax(260px,1.5fr)_minmax(190px,1fr)_150px_125px_85px_48px] border-b border-slate-200 bg-slate-50 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 lg:grid">
                 <span>
-                  Membre
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNameSortDirection(
+                        (current) =>
+                          current === "asc"
+                            ? "desc"
+                            : "asc",
+                      );
+                      setCurrentPage(1);
+                    }}
+                    className="inline-flex items-center gap-1 transition hover:text-slate-700"
+                    aria-label="Trier les membres par nom"
+                  >
+                    Membre
+                    <span
+                      aria-hidden="true"
+                      className="text-[11px]"
+                    >
+                      {nameSortDirection === "asc"
+                        ? "↑"
+                        : "↓"}
+                    </span>
+                  </button>
                 </span>
                 <span>
                   Contact
@@ -2382,10 +2456,6 @@ export function MemberDirectory() {
                   <input
                     type="email"
                     value={form.email}
-                    disabled={Boolean(
-                      editingMember
-                        ?.userId,
-                    )}
                     onChange={(
                       event,
                     ) =>

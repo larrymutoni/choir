@@ -431,30 +431,14 @@ export async function updateCustomRole(
     "system"
   ) {
     if (
-      body.id ===
-      "super_admin"
+      body.id !== "admin"
     ) {
       return json(
         {
           error:
-            "Super administrator role is protected",
+            "Protected system role",
         },
-        403,
-      );
-    }
-
-    if (
-      ![
-        "member",
-        "admin",
-      ].includes(body.id)
-    ) {
-      return json(
-        {
-          error:
-            "Invalid system role",
-        },
-        400,
+        409,
       );
     }
 

@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -97,9 +98,8 @@ export default function ResetPasswordPage() {
               Nouveau mot de passe
             </label>
 
-            <input
+            <PasswordInput
               id="password"
-              type="password"
               autoComplete="new-password"
               minLength={8}
               required
@@ -114,9 +114,8 @@ export default function ResetPasswordPage() {
               Confirmer le mot de passe
             </label>
 
-            <input
+            <PasswordInput
               id="confirmation"
-              type="password"
               autoComplete="new-password"
               minLength={8}
               required

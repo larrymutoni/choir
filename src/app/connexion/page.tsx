@@ -6,6 +6,7 @@ import { CheckCircle2, XCircle } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 type UserRole = "member" | "admin" | "super_admin";
 
@@ -58,12 +59,7 @@ export default function LoginPage() {
 
       setSuccess("Connexion réussie.");
 
-      if (result.user.role === "admin" || result.user.role === "super_admin") {
-        router.replace("/admin");
-      } else {
-        router.replace("/membre");
-      }
-
+      router.replace("/membre");
       router.refresh();
     } catch {
       setError("Connexion impossible.");
@@ -139,9 +135,8 @@ export default function LoginPage() {
                 </Link>
               </div>
 
-              <input
+              <PasswordInput
                 id="password"
-                type="password"
                 autoComplete="current-password"
                 required
                 value={password}

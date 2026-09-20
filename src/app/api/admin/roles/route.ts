@@ -51,6 +51,7 @@ const updateSchema =
         id: z.enum([
           "member",
           "admin",
+          "super_admin",
         ]),
 
         permissions,
