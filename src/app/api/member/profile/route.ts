@@ -6,6 +6,7 @@ import { updateMemberProfile } from "@/server/auth/service";
 const schema = z.object({
   firstname: z.string().trim().min(2).max(80),
   lastname: z.string().trim().min(2).max(80),
+  email: z.string().trim().email().max(254),
   phone: z.string().trim().max(30).optional().nullable(),
 });
 
@@ -35,6 +36,21 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Profile update failed:", error);
+
+    if (
+      error instanceof Error &&
+      error.message.includes("Database request failed: 409")
+    ) {
+      return NextResponse.json(
+        {
+          message:
+            "Cette adresse email est déjà utilisée.",
+        },
+        {
+          status: 409,
+        },
+      );
+    }
 
     return NextResponse.json(
       { message: "Unable to update profile." },

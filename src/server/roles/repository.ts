@@ -53,7 +53,8 @@ export async function updateSystemRole(
   input: {
     id:
       | "member"
-      | "admin";
+      | "admin"
+      | "super_admin";
 
     permissions: RolePermissions;
   },

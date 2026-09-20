@@ -16,10 +16,6 @@ import {
 } from "@/lib/dashboard-navigation";
 
 import {
-  hasRolePermission,
-} from "@/lib/permissions";
-
-import {
   requireUser,
 } from "@/server/auth/guard";
 
@@ -32,8 +28,6 @@ const quickLinks = [
       "/membre/calendrier",
     icon:
       CalendarDays,
-    permission:
-      "calendar" as const,
   },
   {
     title: "Répertoire",
@@ -43,8 +37,6 @@ const quickLinks = [
       "/membre/ressources",
     icon:
       Music2,
-    permission:
-      "resources" as const,
   },
   {
     title: "Galerie",
@@ -54,23 +46,12 @@ const quickLinks = [
       "/membre/galerie",
     icon:
       Images,
-    permission:
-      "gallery" as const,
   },
 ];
 
 export default async function MemberPage() {
   const user =
     await requireUser();
-
-  const visibleQuickLinks =
-    quickLinks.filter(
-      (item) =>
-        hasRolePermission(
-          user,
-          item.permission,
-        ),
-    );
 
   return (
     <main>
@@ -84,7 +65,7 @@ export default async function MemberPage() {
         title={`Bonjour ${user.firstname}`}
       />
 
-      {visibleQuickLinks.length >
+      {quickLinks.length >
         0 && (
         <section>
           <div className="mb-4">
@@ -94,7 +75,7 @@ export default async function MemberPage() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {visibleQuickLinks.map(
+            {quickLinks.map(
               (item) => {
                 const Icon =
                   item.icon;

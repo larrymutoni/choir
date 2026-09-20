@@ -40,14 +40,12 @@ export const dashboardNavigationItems:
       href: "/membre/calendrier",
       iconKey: "calendar",
       group: "main",
-      permission: "calendar",
     },
     {
       label: "Répertoire",
       href: "/membre/ressources",
       iconKey: "resources",
       group: "main",
-      permission: "resources",
     },
     {
       label: "Membres",

@@ -72,6 +72,38 @@ function canManage(
   );
 }
 
+function canManageTarget(
+  session: Parameters<
+    typeof hasRolePermission
+  >[0],
+  target: {
+    role: string;
+    customRoleId?: string | null;
+  },
+) {
+  if (
+    session.role ===
+    "super_admin"
+  ) {
+    return true;
+  }
+
+  if (
+    session.role ===
+    "admin"
+  ) {
+    return (
+      target.role !==
+      "super_admin"
+    );
+  }
+
+  return (
+    target.role === "member" &&
+    !target.customRoleId
+  );
+}
+
 function errorResponse(
   error: unknown,
 ) {
@@ -391,18 +423,15 @@ export async function PATCH(
     }
 
     if (
-      session.role !== "super_admin" &&
-      (
-        target.role !== "member" ||
-        Boolean(
-          target.customRoleId,
-        )
+      !canManageTarget(
+        session,
+        target,
       )
     ) {
       return NextResponse.json(
         {
           message:
-            "Vous ne pouvez pas modifier cet administrateur.",
+            "Vous ne pouvez pas modifier ce membre.",
         },
         {
           status: 403,
@@ -525,18 +554,15 @@ export async function DELETE(
     }
 
     if (
-      session.role !== "super_admin" &&
-      (
-        target.role !== "member" ||
-        Boolean(
-          target.customRoleId,
-        )
+      !canManageTarget(
+        session,
+        target,
       )
     ) {
       return NextResponse.json(
         {
           message:
-            "Vous ne pouvez pas retirer un administrateur.",
+            "Vous ne pouvez pas retirer ce membre.",
         },
         {
           status: 403,

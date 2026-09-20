@@ -598,26 +598,51 @@ export async function updateMember(
         id: string;
       }>();
 
-  if (
-    account &&
+  const emailChanged =
     normalizeEmail(
       existing.email,
-    ) !== input.email
-  ) {
-    return json(
-      {
-        error:
-          "Registered member email cannot be changed",
-      },
-      409,
-    );
+    ) !== input.email;
+
+  /*
+   * Never allow an administrator to assign
+   * an email already owned by another account.
+   */
+  if (emailChanged) {
+    const otherAccount =
+      await env.DB.prepare(
+        `
+        SELECT id
+        FROM users
+        WHERE LOWER(email) =
+              LOWER(?)
+          AND id <> ?
+        LIMIT 1
+        `,
+      )
+        .bind(
+          input.email,
+          account?.id ?? "",
+        )
+        .first<{
+          id: string;
+        }>();
+
+    if (otherAccount) {
+      return json(
+        {
+          error:
+            "Email already belongs to another account",
+        },
+        409,
+      );
+    }
   }
 
   const now =
     new Date().toISOString();
 
-  try {
-    await env.DB.prepare(
+  const statements = [
+    env.DB.prepare(
       `
       UPDATE members
       SET
@@ -628,16 +653,81 @@ export async function updateMember(
         updated_at = ?
       WHERE id = ?
       `,
-    )
-      .bind(
+    ).bind(
+      input.firstname,
+      input.lastname,
+      input.email,
+      input.phone,
+      now,
+      body.id,
+    ),
+  ];
+
+  /*
+   * Keep the authorization email synchronized
+   * only when the address actually changes.
+   */
+  if (emailChanged) {
+    statements.push(
+      env.DB.prepare(
+        `
+        DELETE FROM emails
+        WHERE LOWER(email) =
+              LOWER(?)
+        `,
+      ).bind(
+        existing.email,
+      ),
+
+      env.DB.prepare(
+        `
+        INSERT OR IGNORE INTO emails (
+          id,
+          email,
+          created_at
+        )
+        VALUES (?, ?, ?)
+        `,
+      ).bind(
+        crypto.randomUUID(),
+        input.email,
+        now,
+      ),
+    );
+  }
+
+  /*
+   * If the member already has an account,
+   * synchronize that exact account by ID.
+   */
+  if (account) {
+    statements.push(
+      env.DB.prepare(
+        `
+        UPDATE users
+        SET
+          firstname = ?,
+          lastname = ?,
+          email = ?,
+          phone = ?,
+          updated_at = ?
+        WHERE id = ?
+        `,
+      ).bind(
         input.firstname,
         input.lastname,
         input.email,
         input.phone,
         now,
-        body.id,
-      )
-      .run();
+        account.id,
+      ),
+    );
+  }
+
+  try {
+    await env.DB.batch(
+      statements,
+    );
   } catch (error) {
     const message =
       error instanceof Error
@@ -652,7 +742,7 @@ export async function updateMember(
       return json(
         {
           error:
-            "Email already belongs to another member",
+            "Email already belongs to another member or account",
         },
         409,
       );
@@ -660,57 +750,6 @@ export async function updateMember(
 
     throw error;
   }
-
-  await env.DB.batch([
-    env.DB.prepare(
-      `
-      DELETE FROM emails
-      WHERE LOWER(email) =
-            LOWER(?)
-      `,
-    ).bind(
-      existing.email,
-    ),
-
-    env.DB.prepare(
-      `
-      INSERT OR IGNORE INTO emails (
-        id,
-        email,
-        created_at
-      )
-      VALUES (?, ?, ?)
-      `,
-    ).bind(
-      crypto.randomUUID(),
-      input.email,
-      now,
-    ),
-
-    /*
-     * When a registered member is edited by
-     * an administrator, keep their profile
-     * synchronized.
-     */
-    env.DB.prepare(
-      `
-      UPDATE users
-      SET
-        firstname = ?,
-        lastname = ?,
-        phone = ?,
-        updated_at = ?
-      WHERE LOWER(email) =
-            LOWER(?)
-      `,
-    ).bind(
-      input.firstname,
-      input.lastname,
-      input.phone,
-      now,
-      input.email,
-    ),
-  ]);
 
   return json({
     ok: true,

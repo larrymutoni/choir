@@ -194,6 +194,7 @@ export async function updateMemberProfile(
   input: {
     firstname: string;
     lastname: string;
+    email: string;
     phone?: string | null;
   },
 ) {

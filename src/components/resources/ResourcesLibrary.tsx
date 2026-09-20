@@ -1145,26 +1145,43 @@ export function ResourcesLibrary() {
                                   )}
                                 </p>
 
-                                {canManage && (
-                                  <button
-                                    type="button"
-                                    disabled={
-                                      deleting ===
-                                      selectedAudio.id
-                                    }
-                                    onClick={() =>
-                                      void deleteFile(
+                                <div className="flex shrink-0 items-center gap-1">
+                                  {selectedAudio.downloadable && (
+                                    <a
+                                      href={downloadUrl(
                                         selectedAudio,
-                                      )
-                                    }
-                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
-                                    aria-label="Supprimer le fichier audio"
-                                  >
-                                    <Trash2
-                                      size={14}
-                                    />
-                                  </button>
-                                )}
+                                      )}
+                                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-900"
+                                      aria-label="Télécharger le fichier audio"
+                                      title="Télécharger"
+                                    >
+                                      <Download
+                                        size={14}
+                                      />
+                                    </a>
+                                  )}
+
+                                  {canManage && (
+                                    <button
+                                      type="button"
+                                      disabled={
+                                        deleting ===
+                                        selectedAudio.id
+                                      }
+                                      onClick={() =>
+                                        void deleteFile(
+                                          selectedAudio,
+                                        )
+                                      }
+                                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                                      aria-label="Supprimer le fichier audio"
+                                    >
+                                      <Trash2
+                                        size={14}
+                                      />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
 
                               <ResourceAudioPlayer

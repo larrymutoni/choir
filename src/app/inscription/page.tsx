@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -133,9 +134,8 @@ export default function RegisterPage() {
               Mot de passe
             </label>
 
-            <input
+            <PasswordInput
               id="password"
-              type="password"
               autoComplete="new-password"
               minLength={8}
               required

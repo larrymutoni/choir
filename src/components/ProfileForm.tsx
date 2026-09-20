@@ -17,6 +17,7 @@ import Link from "next/link";
 import { type ChangeEvent, type FormEvent, useRef, useState } from "react";
 
 import { useRouter } from "next/navigation";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 type Role = "member" | "admin" | "super_admin";
 
@@ -57,6 +58,8 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
   const [firstname, setFirstname] = useState(profile.firstname);
 
   const [lastname, setLastname] = useState(profile.lastname);
+
+  const [email, setEmail] = useState(profile.email);
 
   const [phone, setPhone] = useState(profile.phone ?? "");
 
@@ -112,7 +115,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
         body: JSON.stringify({
           firstname,
           lastname,
-
+          email: email.trim(),
           phone: phone.trim() || null,
         }),
       });
@@ -124,6 +127,8 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
           result.message ?? "Impossible d’enregistrer le profil.",
         );
       }
+
+      setEmail(email.trim().toLowerCase());
 
       setProfileSuccess("Profil enregistré.");
 
@@ -337,7 +342,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
           </span>
 
           <p className="mt-4 break-all text-sm text-[#64748b]">
-            {profile.email}
+            {email}
           </p>
 
           {avatarKey && (
@@ -452,9 +457,15 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
                 />
 
                 <input
-                  value={profile.email}
-                  disabled
-                  className="h-10 w-full cursor-not-allowed rounded-lg border border-[#e2e8f0] bg-[#f8fafc] pl-9 pr-3 text-sm text-[#94a3b8]"
+                  type="email"
+                  value={email}
+                  onChange={(event) =>
+                    setEmail(event.target.value)
+                  }
+                  required
+                  maxLength={254}
+                  autoComplete="email"
+                  className="h-10 w-full rounded-lg border border-[#e2e8f0] pl-9 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                 />
               </div>
             </label>
@@ -519,8 +530,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
                   className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]"
                 />
 
-                <input
-                  type="password"
+                <PasswordInput
                   autoComplete="current-password"
                   value={currentPassword}
                   onChange={(event) => setCurrentPassword(event.target.value)}
@@ -536,8 +546,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
                   Nouveau mot de passe
                 </span>
 
-                <input
-                  type="password"
+                <PasswordInput
                   autoComplete="new-password"
                   value={newPassword}
                   onChange={(event) => setNewPassword(event.target.value)}
@@ -553,8 +562,7 @@ export default function ProfileForm({ profile }: { profile: Profile }) {
                   Confirmer
                 </span>
 
-                <input
-                  type="password"
+                <PasswordInput
                   autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}

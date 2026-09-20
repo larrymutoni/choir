@@ -593,82 +593,277 @@ export async function updateUserRole(
   });
 }
 
-export async function updateUserProfile(request: Request, env: Env) {
-  const body = await readJson<{
-    userId?: string;
-    firstname?: string;
-    lastname?: string;
-    phone?: string | null;
-  }>(request);
+export async function updateUserProfile(
+  request: Request,
+  env: Env,
+) {
+  const body =
+    await readJson<{
+      userId?: string;
+      firstname?: string;
+      lastname?: string;
+      email?: string;
+      phone?: string | null;
+    }>(request);
 
-  if (!body.userId || !body.firstname?.trim() || !body.lastname?.trim()) {
+  if (
+    !body.userId ||
+    !body.firstname?.trim() ||
+    !body.lastname?.trim() ||
+    !body.email?.trim()
+  ) {
     return json(
       {
-        error: "Missing profile data",
+        error:
+          "Missing profile data",
       },
       400,
     );
   }
 
-  const now = new Date().toISOString();
+  const email =
+    normalizeEmail(
+      body.email,
+    );
 
-  const results = await env.DB.batch([
+  const existingUser =
+    await env.DB.prepare(
+      `
+      SELECT
+        id,
+        email
+      FROM users
+      WHERE id = ?
+      LIMIT 1
+      `,
+    )
+      .bind(
+        body.userId,
+      )
+      .first<{
+        id: string;
+        email: string;
+      }>();
+
+  if (!existingUser) {
+    return json(
+      {
+        error:
+          "User not found",
+      },
+      404,
+    );
+  }
+
+  const oldEmail =
+    normalizeEmail(
+      existingUser.email,
+    );
+
+  const emailChanged =
+    oldEmail !== email;
+
+  /*
+   * The new address must not belong
+   * to another registered account.
+   */
+  if (emailChanged) {
+    const otherUser =
+      await env.DB.prepare(
+        `
+        SELECT id
+        FROM users
+        WHERE LOWER(email) =
+              LOWER(?)
+          AND id <> ?
+        LIMIT 1
+        `,
+      )
+        .bind(
+          email,
+          body.userId,
+        )
+        .first<{
+          id: string;
+        }>();
+
+    if (otherUser) {
+      return json(
+        {
+          error:
+            "Email already belongs to another account",
+        },
+        409,
+      );
+    }
+
+    /*
+     * It must not belong to another
+     * official choir member either.
+     */
+    const otherMember =
+      await env.DB.prepare(
+        `
+        SELECT id
+        FROM members
+        WHERE LOWER(email) =
+              LOWER(?)
+          AND LOWER(email) <>
+              LOWER(?)
+        LIMIT 1
+        `,
+      )
+        .bind(
+          email,
+          oldEmail,
+        )
+        .first<{
+          id: string;
+        }>();
+
+    if (otherMember) {
+      return json(
+        {
+          error:
+            "Email already belongs to another member",
+        },
+        409,
+      );
+    }
+  }
+
+  /*
+   * Locate the official member before
+   * changing users.email.
+   */
+  const member =
+    await env.DB.prepare(
+      `
+      SELECT id
+      FROM members
+      WHERE LOWER(email) =
+            LOWER(?)
+      LIMIT 1
+      `,
+    )
+      .bind(
+        oldEmail,
+      )
+      .first<{
+        id: string;
+      }>();
+
+  const now =
+    new Date().toISOString();
+
+  const statements = [
     env.DB.prepare(
       `
-        UPDATE users
-        SET
-          firstname = ?,
-          lastname = ?,
-          phone = ?,
-          updated_at = ?
-        WHERE id = ?
-        `,
+      UPDATE users
+      SET
+        firstname = ?,
+        lastname = ?,
+        email = ?,
+        phone = ?,
+        updated_at = ?
+      WHERE id = ?
+      `,
     ).bind(
       body.firstname.trim(),
       body.lastname.trim(),
+      email,
       body.phone?.trim() || null,
       now,
       body.userId,
     ),
+  ];
 
-    /*
-     * If this account belongs to an official
-     * member, keep the pre-registration
-     * member record synchronized too.
-     */
-    env.DB.prepare(
-      `
+  /*
+   * Keep the official member record
+   * synchronized with the account.
+   */
+  if (member) {
+    statements.push(
+      env.DB.prepare(
+        `
         UPDATE members
         SET
           firstname = ?,
           lastname = ?,
+          email = ?,
           phone = ?,
           updated_at = ?
-        WHERE LOWER(email) = LOWER(
-          (
-            SELECT email
-            FROM users
-            WHERE id = ?
-            LIMIT 1
-          )
-        )
+        WHERE id = ?
         `,
-    ).bind(
-      body.firstname.trim(),
-      body.lastname.trim(),
-      body.phone?.trim() || null,
-      now,
-      body.userId,
-    ),
-  ]);
-
-  if (results[0].meta.changes === 0) {
-    return json(
-      {
-        error: "User not found",
-      },
-      404,
+      ).bind(
+        body.firstname.trim(),
+        body.lastname.trim(),
+        email,
+        body.phone?.trim() || null,
+        now,
+        member.id,
+      ),
     );
+
+    /*
+     * Keep the legacy authorized-email
+     * table synchronized too.
+     */
+    if (emailChanged) {
+      statements.push(
+        env.DB.prepare(
+          `
+          DELETE FROM emails
+          WHERE LOWER(email) =
+                LOWER(?)
+          `,
+        ).bind(
+          oldEmail,
+        ),
+
+        env.DB.prepare(
+          `
+          INSERT OR IGNORE INTO emails (
+            id,
+            email,
+            created_at
+          )
+          VALUES (?, ?, ?)
+          `,
+        ).bind(
+          crypto.randomUUID(),
+          email,
+          now,
+        ),
+      );
+    }
+  }
+
+  try {
+    await env.DB.batch(
+      statements,
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : String(error);
+
+    if (
+      message.includes(
+        "UNIQUE",
+      )
+    ) {
+      return json(
+        {
+          error:
+            "Email already belongs to another member or account",
+        },
+        409,
+      );
+    }
+
+    throw error;
   }
 
   return json({

@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   CalendarDays,
   Clock3,
+  Download,
   FileText,
   FileUp,
   MapPin,
@@ -277,6 +278,84 @@ function formatUpcomingEvent(
       minute: "2-digit",
     },
   ).format(date);
+}
+
+function escapeIcsText(
+  value: string,
+) {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/\r?\n/g, "\\n")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;");
+}
+
+function formatIcsUtc(
+  value: string,
+) {
+  return new Date(value)
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}Z$/, "Z");
+}
+
+function formatIcsDate(
+  value: string,
+) {
+  const parts =
+    new Intl.DateTimeFormat(
+      "en-GB",
+      {
+        timeZone:
+          "Europe/Paris",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      },
+    ).formatToParts(
+      new Date(value),
+    );
+
+  const get =
+    (type: string) =>
+      parts.find(
+        (part) =>
+          part.type === type,
+      )?.value ?? "";
+
+  return `${get("year")}${get("month")}${get("day")}`;
+}
+
+function nextIcsDate(
+  value: string,
+) {
+  const year =
+    Number(value.slice(0, 4));
+
+  const month =
+    Number(value.slice(4, 6));
+
+  const day =
+    Number(value.slice(6, 8));
+
+  const date =
+    new Date(
+      Date.UTC(
+        year,
+        month - 1,
+        day + 1,
+      ),
+    );
+
+  return [
+    date.getUTCFullYear(),
+    String(
+      date.getUTCMonth() + 1,
+    ).padStart(2, "0"),
+    String(
+      date.getUTCDate(),
+    ).padStart(2, "0"),
+  ].join("");
 }
 
 export function CalendarClient({
@@ -1351,6 +1430,161 @@ export function CalendarClient({
     }
   }
 
+  function exportCalendarView() {
+    if (
+      displayEvents.length === 0
+    ) {
+      showToast(
+        "Aucun événement à exporter",
+      );
+
+      return;
+    }
+
+    const stamp =
+      formatIcsUtc(
+        new Date().toISOString(),
+      );
+
+    const eventLines =
+      [...displayEvents]
+        .sort(
+          (left, right) =>
+            new Date(
+              left.start,
+            ).getTime() -
+            new Date(
+              right.start,
+            ).getTime(),
+        )
+        .flatMap(
+          (event) => {
+            const lines = [
+              "BEGIN:VEVENT",
+              `UID:${event.id}-${event.start.replace(/[^0-9A-Za-z]/g, "")}@rayon-de-soleil-lyon6`,
+              `DTSTAMP:${stamp}`,
+              `SUMMARY:${escapeIcsText(event.title)}`,
+            ];
+
+            if (
+              event.allDay
+            ) {
+              const start =
+                formatIcsDate(
+                  event.start,
+                );
+
+              const end =
+                event.end
+                  ? formatIcsDate(
+                      event.end,
+                    )
+                  : nextIcsDate(
+                      start,
+                    );
+
+              lines.push(
+                `DTSTART;VALUE=DATE:${start}`,
+                `DTEND;VALUE=DATE:${end}`,
+              );
+            } else {
+              lines.push(
+                `DTSTART:${formatIcsUtc(event.start)}`,
+              );
+
+              if (
+                event.end
+              ) {
+                lines.push(
+                  `DTEND:${formatIcsUtc(event.end)}`,
+                );
+              }
+            }
+
+            if (
+              event.extendedProps
+                .location
+            ) {
+              lines.push(
+                `LOCATION:${escapeIcsText(
+                  event.extendedProps
+                    .location,
+                )}`,
+              );
+            }
+
+            if (
+              event.extendedProps
+                .notes
+            ) {
+              lines.push(
+                `DESCRIPTION:${escapeIcsText(
+                  event.extendedProps
+                    .notes,
+                )}`,
+              );
+            }
+
+            lines.push(
+              "END:VEVENT",
+            );
+
+            return lines;
+          },
+        );
+
+    const content = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Chorale Rayon de Soleil Lyon 6//Calendrier//FR",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "X-WR-CALNAME:Chorale Rayon de Soleil Lyon 6",
+      ...eventLines,
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n");
+
+    const blob =
+      new Blob(
+        [content],
+        {
+          type:
+            "text/calendar;charset=utf-8",
+        },
+      );
+
+    const url =
+      URL.createObjectURL(
+        blob,
+      );
+
+    const link =
+      document.createElement(
+        "a",
+      );
+
+    link.href = url;
+
+    link.download =
+      "calendrier-rayon-de-soleil.ics";
+
+    document.body.appendChild(
+      link,
+    );
+
+    link.click();
+    link.remove();
+
+    URL.revokeObjectURL(
+      url,
+    );
+
+    showToast(
+      "Calendrier exporté",
+    );
+  }
+
   const inputClass =
     "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[16px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 sm:text-sm";
 
@@ -1381,41 +1615,61 @@ export function CalendarClient({
   return (
     <>
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        {canManage && (
-          <div className="flex flex-wrap items-center justify-end gap-2 border-b border-[#e2e8f0] px-4 py-3 sm:px-5">
-            <button
-              type="button"
-              onClick={() =>
-                setImportOpen(
-                  true,
-                )
-              }
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-            >
-              <FileUp
-                size={16}
-              />
+        <div className="flex flex-wrap items-center justify-end gap-2 border-b border-[#e2e8f0] px-4 py-3 sm:px-5">
+          <button
+            type="button"
+            onClick={
+              exportCalendarView
+            }
+            disabled={
+              displayEvents.length ===
+              0
+            }
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Download
+              size={16}
+            />
 
-              Importer un planning
-            </button>
+            Exporter la vue (.ics)
+          </button>
 
-            <button
-              type="button"
-              onClick={() =>
-                openCreate(
-                  new Date(),
-                )
-              }
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
-            >
-              <Plus
-                size={16}
-              />
+          {canManage && (
+            <>
+              <button
+                type="button"
+                onClick={() =>
+                  setImportOpen(
+                    true,
+                  )
+                }
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+              >
+                <FileUp
+                  size={16}
+                />
 
-              Ajouter
-            </button>
-          </div>
-        )}
+                Importer un planning
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  openCreate(
+                    new Date(),
+                  )
+                }
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+              >
+                <Plus
+                  size={16}
+                />
+
+                Ajouter
+              </button>
+            </>
+          )}
+        </div>
 
         {calendarError && (
           <div

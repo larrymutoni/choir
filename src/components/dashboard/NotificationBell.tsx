@@ -28,6 +28,9 @@ export default function NotificationBell() {
 
   const [open, setOpen] = useState(false);
 
+  const [markingAll, setMarkingAll] =
+    useState(false);
+
   const load = useCallback(async () => {
     try {
       const response = await fetch(
@@ -110,6 +113,70 @@ export default function NotificationBell() {
     router.push(notification.href);
   }
 
+  async function markAllAsRead() {
+    if (
+      markingAll ||
+      notifications.length === 0
+    ) {
+      return;
+    }
+
+    const pending = [
+      ...notifications,
+    ];
+
+    setMarkingAll(true);
+
+    /*
+     * Optimistic UI:
+     * the badge and the list disappear immediately.
+     */
+    setNotifications([]);
+
+    try {
+      const responses =
+        await Promise.all(
+          pending.map(
+            (notification) =>
+              fetch(
+                "/api/member/notifications",
+                {
+                  method: "PATCH",
+                  headers: {
+                    "Content-Type":
+                      "application/json",
+                  },
+                  body:
+                    JSON.stringify({
+                      notificationId:
+                        notification.id,
+                    }),
+                },
+              ),
+          ),
+        );
+
+      if (
+        responses.some(
+          (response) =>
+            !response.ok,
+        )
+      ) {
+        throw new Error(
+          "Impossible de marquer toutes les notifications comme lues.",
+        );
+      }
+    } catch {
+      /*
+       * If one update failed, reload the real
+       * unread state from the server.
+       */
+      await load();
+    } finally {
+      setMarkingAll(false);
+    }
+  }
+
   return (
     <div className="relative">
       <button
@@ -138,10 +205,25 @@ export default function NotificationBell() {
           />
 
           <div className="absolute right-0 top-11 z-50 w-[min(88vw,340px)] overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl">
-            <div className="border-b border-zinc-100 px-4 py-3">
+            <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
               <p className="text-sm font-semibold text-zinc-900">
                 Notifications
               </p>
+
+              {notifications.length > 0 && (
+                <button
+                  type="button"
+                  disabled={markingAll}
+                  onClick={() =>
+                    void markAllAsRead()
+                  }
+                  className="text-xs font-semibold text-blue-600 transition hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {markingAll
+                    ? "Lecture…"
+                    : "Tout marquer comme lu"}
+                </button>
+              )}
             </div>
 
             {notifications.length === 0 ? (

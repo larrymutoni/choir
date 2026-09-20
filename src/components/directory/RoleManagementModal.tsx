@@ -288,13 +288,6 @@ export function RoleManagementModal({
   function openSystem(
     role: SystemRoleEntry,
   ) {
-    if (
-      role.id ===
-      "super_admin"
-    ) {
-      return;
-    }
-
     setName(role.name);
 
     setPermissions({
@@ -588,9 +581,7 @@ export function RoleManagementModal({
               <div className="space-y-3">
                 {systemRoles.map(
                   (role) => {
-                    const protectedRole =
-                      role.id ===
-                      "super_admin";
+                    const protectedRole = false;
 
                     return (
                       <div
@@ -627,7 +618,7 @@ export function RoleManagementModal({
 
                             <p className="mt-1 text-xs leading-5 text-slate-500">
                               {protectedRole
-                                ? "Accès complet · Protégé"
+                                ? "Rôle système · Protégé"
                                 : permissionSummary(
                                     role.permissions,
                                   )}
