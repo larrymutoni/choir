@@ -183,6 +183,24 @@ export async function deleteMember(
   });
 }
 
+export async function deleteUnvalidatedMemberUser(
+  userId: string,
+) {
+  return dbRequest<{
+    ok: true;
+  }>(
+    "/v1/members/unvalidated-user",
+    {
+      method: "DELETE",
+
+      body:
+        JSON.stringify({
+          userId,
+        }),
+    },
+  );
+}
+
 export async function approveMemberUser(
   userId: string,
 ) {

@@ -8,6 +8,7 @@ import {
   approveMemberUser,
   createMember,
   deleteMember,
+  deleteUnvalidatedMemberUser,
   listMemberEntries,
   rejectMemberUser,
   updateMember,
@@ -499,8 +500,25 @@ export async function DELETE(
     .object({
       id: z
         .string()
-        .min(1),
+        .min(1)
+        .optional(),
+
+      userId: z
+        .string()
+        .min(1)
+        .optional(),
     })
+    .refine(
+      (value) =>
+        Boolean(
+          value.id ||
+          value.userId,
+        ),
+      {
+        message:
+          "Member or user ID required.",
+      },
+    )
     .safeParse(body);
 
   if (!parsed.success) {
@@ -518,6 +536,75 @@ export async function DELETE(
   try {
     const entries =
       await listMemberEntries();
+
+    if (
+      parsed.data.userId &&
+      !parsed.data.id
+    ) {
+      const target =
+        entries.find(
+          (entry) =>
+            entry.userId ===
+            parsed.data.userId,
+        );
+
+      if (!target) {
+        return NextResponse.json(
+          {
+            message:
+              "Membre introuvable.",
+          },
+          {
+            status: 404,
+          },
+        );
+      }
+
+      if (
+        target.userId ===
+        session.user_id
+      ) {
+        return NextResponse.json(
+          {
+            message:
+              "Vous ne pouvez pas supprimer votre propre compte.",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+
+      if (
+        target.role !==
+          "member" ||
+        ![
+          "pending",
+          "rejected",
+        ].includes(
+          target.accountStatus ??
+            "",
+        )
+      ) {
+        return NextResponse.json(
+          {
+            message:
+              "Seuls les comptes membres non validés peuvent être supprimés ici.",
+          },
+          {
+            status: 403,
+          },
+        );
+      }
+
+      await deleteUnvalidatedMemberUser(
+        parsed.data.userId,
+      );
+
+      return NextResponse.json({
+        ok: true,
+      });
+    }
 
     const target =
       entries.find(
@@ -571,7 +658,7 @@ export async function DELETE(
     }
 
     await deleteMember(
-      parsed.data.id,
+      target.membershipId!,
     );
 
     return NextResponse.json({

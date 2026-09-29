@@ -876,6 +876,90 @@ export async function deleteMember(
   });
 }
 
+export async function deleteUnvalidatedMemberUser(
+  request: Request,
+  env: Env,
+) {
+  const body =
+    await readJson<{
+      userId?: string;
+    }>(request);
+
+  if (!body.userId) {
+    return json(
+      {
+        error:
+          "User ID is required",
+      },
+      400,
+    );
+  }
+
+  const user =
+    await env.DB.prepare(
+      `
+      SELECT
+        users.id,
+        users.status,
+        roles.name AS role
+      FROM users
+      JOIN roles
+        ON roles.id =
+           users.role_id
+      WHERE users.id = ?
+      LIMIT 1
+      `,
+    )
+      .bind(body.userId)
+      .first<{
+        id: string;
+        status:
+          | "pending"
+          | "active"
+          | "rejected";
+        role: string;
+      }>();
+
+  if (!user) {
+    return json(
+      {
+        error:
+          "User not found",
+      },
+      404,
+    );
+  }
+
+  if (
+    user.role !== "member" ||
+    ![
+      "pending",
+      "rejected",
+    ].includes(user.status)
+  ) {
+    return json(
+      {
+        error:
+          "Only unvalidated member accounts can be deleted",
+      },
+      400,
+    );
+  }
+
+  await env.DB.prepare(
+    `
+    DELETE FROM users
+    WHERE id = ?
+    `,
+  )
+    .bind(user.id)
+    .run();
+
+  return json({
+    ok: true,
+  });
+}
+
 export async function approveMemberUser(
   request: Request,
   env: Env,

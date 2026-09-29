@@ -55,6 +55,7 @@ import {
   approveMemberUser,
   createMember,
   deleteMember,
+  deleteUnvalidatedMemberUser,
   importMembers,
   listMembers,
   rejectMemberUser,
@@ -79,6 +80,11 @@ import {
   listUnreadNotifications,
   markNotificationSeen,
 } from "./notifications";
+
+import {
+  listSiteContent,
+  updateSiteContent,
+} from "./content";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -136,6 +142,30 @@ export default {
             private_storage: true,
           },
         });
+      }
+
+      /*
+       * SITE CONTENT
+       */
+
+      if (
+        request.method === "GET" &&
+        url.pathname === "/v1/site-content"
+      ) {
+        return listSiteContent(
+          request,
+          env,
+        );
+      }
+
+      if (
+        request.method === "PUT" &&
+        url.pathname === "/v1/site-content"
+      ) {
+        return updateSiteContent(
+          request,
+          env,
+        );
       }
 
       /*
@@ -228,6 +258,17 @@ export default {
 
       if (request.method === "DELETE" && url.pathname === "/v1/members") {
         return deleteMember(request, env);
+      }
+
+      if (
+        request.method === "DELETE" &&
+        url.pathname ===
+          "/v1/members/unvalidated-user"
+      ) {
+        return deleteUnvalidatedMemberUser(
+          request,
+          env,
+        );
       }
 
       if (

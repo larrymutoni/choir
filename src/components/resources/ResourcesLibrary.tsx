@@ -2,6 +2,8 @@
 
 import {
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   Download,
   FileAudio,
   FileText,
@@ -67,6 +69,30 @@ const ALPHABET =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(
     "",
   );
+
+const PAGE_SIZE = 10;
+
+function songLastUpdated(
+  song: Song,
+) {
+  const dates = [
+    song.updatedAt,
+    ...song.files.map(
+      (file) =>
+        file.updatedAt,
+    ),
+  ]
+    .map((value) =>
+      new Date(value).getTime(),
+    )
+    .filter(
+      Number.isFinite,
+    );
+
+  return dates.length > 0
+    ? Math.max(...dates)
+    : 0;
+}
 
 function fileStem(
   filename: string,
@@ -143,6 +169,11 @@ export function ResourcesLibrary() {
   ] = useState<
     string | null
   >(null);
+
+  const [
+    page,
+    setPage,
+  ] = useState(1);
 
   const [
     selectedSongId,
@@ -270,42 +301,82 @@ export function ResourcesLibrary() {
           .trim()
           .toLowerCase();
 
-      return songs.filter(
-        (song) => {
-          const matchesSearch =
-            !query ||
-            song.title
-              .toLowerCase()
-              .includes(
-                query,
-              ) ||
-            (
-              song.composer ??
-              ""
-            )
-              .toLowerCase()
-              .includes(
-                query,
-              );
+      return songs
+        .filter(
+          (song) => {
+            const matchesSearch =
+              !query ||
+              song.title
+                .toLowerCase()
+                .includes(
+                  query,
+                ) ||
+              (
+                song.composer ??
+                ""
+              )
+                .toLowerCase()
+                .includes(
+                  query,
+                );
 
-          const matchesLetter =
-            !activeLetter ||
-            initialLetter(
-              song.title,
-            ) ===
-              activeLetter;
+            const matchesLetter =
+              !activeLetter ||
+              initialLetter(
+                song.title,
+              ) ===
+                activeLetter;
 
-          return (
-            matchesSearch &&
-            matchesLetter
-          );
-        },
-      );
+            return (
+              matchesSearch &&
+              matchesLetter
+            );
+          },
+        )
+        .sort(
+          (left, right) =>
+            songLastUpdated(
+              right,
+            ) -
+            songLastUpdated(
+              left,
+            ),
+        );
     }, [
       songs,
       search,
       activeLetter,
     ]);
+
+  const pageCount =
+    Math.max(
+      1,
+      Math.ceil(
+        filteredSongs.length /
+          PAGE_SIZE,
+      ),
+    );
+
+  const currentPage =
+    Math.min(
+      page,
+      pageCount,
+    );
+
+  const paginatedSongs =
+    filteredSongs.slice(
+      (currentPage - 1) *
+        PAGE_SIZE,
+      currentPage *
+        PAGE_SIZE,
+    );
+
+  useEffect(() => {
+    setPage(1);
+  }, [
+    search,
+    activeLetter,
+  ]);
 
   const availableLetters =
     useMemo(
@@ -794,7 +865,7 @@ export function ResourcesLibrary() {
                     </div>
                   </div>
                 ) : (
-                  filteredSongs.map(
+                  paginatedSongs.map(
                     (song) => {
                       const selected =
                         selectedSongId ===
@@ -890,7 +961,9 @@ export function ResourcesLibrary() {
                                 },
                               ).format(
                                 new Date(
-                                  song.updatedAt,
+                                  songLastUpdated(
+                                    song,
+                                  ),
                                 ),
                               )}
                             </span>
@@ -943,6 +1016,91 @@ export function ResourcesLibrary() {
                       );
                     },
                   )
+                )}
+
+                {pageCount > 1 && (
+                  <div className="flex items-center justify-center gap-1 border-t border-slate-100 px-3 py-3">
+                    <button
+                      type="button"
+                      aria-label="Page précédente"
+                      disabled={
+                        currentPage ===
+                        1
+                      }
+                      onClick={() =>
+                        setPage(
+                          Math.max(
+                            1,
+                            currentPage -
+                              1,
+                          ),
+                        )
+                      }
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+                    >
+                      <ChevronLeft
+                        size={15}
+                      />
+                    </button>
+
+                    {Array.from(
+                      {
+                        length:
+                          pageCount,
+                      },
+                      (_, index) =>
+                        index + 1,
+                    ).map(
+                      (
+                        pageNumber,
+                      ) => (
+                        <button
+                          key={
+                            pageNumber
+                          }
+                          type="button"
+                          onClick={() =>
+                            setPage(
+                              pageNumber,
+                            )
+                          }
+                          className={`h-8 min-w-8 rounded-lg px-2 text-xs font-semibold ${
+                            currentPage ===
+                            pageNumber
+                              ? "bg-slate-900 text-white"
+                              : "text-slate-600 hover:bg-slate-100"
+                          }`}
+                        >
+                          {
+                            pageNumber
+                          }
+                        </button>
+                      ),
+                    )}
+
+                    <button
+                      type="button"
+                      aria-label="Page suivante"
+                      disabled={
+                        currentPage ===
+                        pageCount
+                      }
+                      onClick={() =>
+                        setPage(
+                          Math.min(
+                            pageCount,
+                            currentPage +
+                              1,
+                          ),
+                        )
+                      }
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+                    >
+                      <ChevronRight
+                        size={15}
+                      />
+                    </button>
+                  </div>
                 )}
               </div>
             </section>

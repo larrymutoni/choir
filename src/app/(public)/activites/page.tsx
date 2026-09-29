@@ -5,27 +5,7 @@ import { Reveal } from "@/components/ui/Reveal";
 import { contentArrayToMap } from "@/lib/content";
 import { getSupabaseImageUrl } from "@/lib/images";
 import { createClient } from "@/lib/supabase/server";
-
-const activities = [
-  {
-    icon: Mic2,
-    title: "Répétitions",
-    description:
-      "Chaque semaine, le groupe travaille le répertoire, l’écoute et la cohésion vocale.",
-  },
-  {
-    icon: Music2,
-    title: "Répertoire",
-    description:
-      "Variétés françaises et étrangères, chants connus et morceaux choisis selon les projets.",
-  },
-  {
-    icon: Sparkles,
-    title: "Vie de groupe",
-    description:
-      "Des moments simples, humains et musicaux autour du plaisir de chanter ensemble.",
-  },
-];
+import { listSiteContent } from "@/server/content/repository";
 
 function formatDate(date: string) {
   return new Intl.DateTimeFormat("fr-FR", {
@@ -38,9 +18,9 @@ function formatDate(date: string) {
 export default async function ActivitiesPage() {
   const supabase = await createClient();
 
-  const [{ data: siteContent }, { data: siteImages }, { data: events }] =
+  const [siteContent, { data: siteImages }, { data: events }] =
     await Promise.all([
-      supabase.from("site_content").select("key, value"),
+      listSiteContent(),
       supabase.from("site_images").select("key, path, alt_text, updated_at"),
       supabase
         .from("events")
@@ -72,6 +52,40 @@ export default async function ActivitiesPage() {
     content.activities_intro ||
     "Répétitions, concerts et moments de partage autour de la musique.";
 
+  const activitiesTitle =
+    content.activities_title ||
+    "Chanter, répéter, partager.";
+
+  const activities = [
+    {
+      icon: Mic2,
+      title:
+        content.activities_rehearsals_title ||
+        "Répétitions",
+      description:
+        content.activities_rehearsals_text ||
+        "Chaque semaine, le groupe travaille le répertoire, l’écoute et la cohésion vocale.",
+    },
+    {
+      icon: Music2,
+      title:
+        content.activities_repertoire_title ||
+        "Répertoire",
+      description:
+        content.activities_repertoire_text ||
+        "Variétés françaises et étrangères, chants connus et morceaux choisis selon les projets.",
+    },
+    {
+      icon: Sparkles,
+      title:
+        content.activities_group_title ||
+        "Vie de groupe",
+      description:
+        content.activities_group_text ||
+        "Des moments simples, humains et musicaux autour du plaisir de chanter ensemble.",
+    },
+  ];
+
   return (
     <>
       <Navbar />
@@ -83,7 +97,7 @@ export default async function ActivitiesPage() {
               <p className="eyebrow">Activités</p>
 
               <h1 className="editorial-title mt-5 max-w-3xl text-5xl leading-tight text-[#1f1f1a] sm:text-6xl">
-                Chanter, répéter, partager.
+                {activitiesTitle}
               </h1>
 
               <p className="mt-7 max-w-xl text-base leading-8 text-[#6d6b63] sm:text-lg">

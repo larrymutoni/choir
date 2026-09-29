@@ -33,7 +33,7 @@ export async function notifyMembersOfUpdate({
   const users = await getUsersForAdmin();
 
   const recipients = users.filter(
-    (user) => user.status === "active" && user.id !== createdByUserId,
+    (user) => user.status === "active",
   );
 
   if (recipients.length === 0) {

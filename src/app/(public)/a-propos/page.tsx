@@ -5,40 +5,56 @@ import { Reveal } from "@/components/ui/Reveal";
 import { contentArrayToMap } from "@/lib/content";
 import { getSupabaseImageUrl } from "@/lib/images";
 import { createClient } from "@/lib/supabase/server";
-
-const values = [
-  {
-    icon: Heart,
-    title: "Convivialité",
-    description: "Un groupe où l’on vient chanter, mais aussi se retrouver.",
-  },
-  {
-    icon: Music2,
-    title: "Plaisir musical",
-    description: "Un répertoire varié, travaillé avec régularité et envie.",
-  },
-  {
-    icon: Sparkles,
-    title: "Progression",
-    description: "Chaque voix compte et avance au rythme du collectif.",
-  },
-  {
-    icon: Users,
-    title: "Ouverture",
-    description:
-      "Une chorale accueillante pour celles et ceux qui aiment chanter.",
-  },
-];
+import { listSiteContent } from "@/server/content/repository";
 
 export default async function AboutPage() {
   const supabase = await createClient();
 
-  const [{ data: siteContent }, { data: siteImages }] = await Promise.all([
-    supabase.from("site_content").select("key, value"),
+  const [siteContent, { data: siteImages }] = await Promise.all([
+    listSiteContent(),
     supabase.from("site_images").select("key, path, alt_text, updated_at"),
   ]);
 
   const content = contentArrayToMap(siteContent);
+
+  const values = [
+    {
+      icon: Heart,
+      title:
+        content.about_value_conviviality_title ||
+        "Convivialité",
+      description:
+        content.about_value_conviviality_text ||
+        "Un groupe où l’on vient chanter, mais aussi se retrouver.",
+    },
+    {
+      icon: Music2,
+      title:
+        content.about_value_music_title ||
+        "Plaisir musical",
+      description:
+        content.about_value_music_text ||
+        "Un répertoire varié, travaillé avec régularité et envie.",
+    },
+    {
+      icon: Sparkles,
+      title:
+        content.about_value_progress_title ||
+        "Progression",
+      description:
+        content.about_value_progress_text ||
+        "Chaque voix compte et avance au rythme du collectif.",
+    },
+    {
+      icon: Users,
+      title:
+        content.about_value_openness_title ||
+        "Ouverture",
+      description:
+        content.about_value_openness_text ||
+        "Une chorale accueillante pour celles et ceux qui aiment chanter.",
+    },
+  ];
 
   const imageMap = (siteImages ?? []).reduce<
     Record<string, { path: string; alt_text: string; updated_at: string }>

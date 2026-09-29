@@ -109,7 +109,7 @@ const emptyForm: MemberForm = {
     "system:member",
 };
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 
 function normalizeEmail(
   value: string,
@@ -908,16 +908,27 @@ export function MemberDirectory() {
     member: MemberEntry,
   ) {
     if (
-      !canEditTarget(
-        member,
-      )
+      !canManage ||
+      member.userId ===
+        currentUserId
     ) {
       return false;
     }
 
-    return (
-      member.userId !==
-      currentUserId
+    const status =
+      statusOf(member);
+
+    if (
+      (status === "pending" ||
+        status === "rejected") &&
+      member.userId &&
+      member.role === "member"
+    ) {
+      return true;
+    }
+
+    return canEditTarget(
+      member,
     );
   }
 
@@ -1222,7 +1233,8 @@ export function MemberDirectory() {
     member: MemberEntry,
   ) {
     if (
-      !member.membershipId
+      !member.membershipId &&
+      !member.userId
     ) {
       return;
     }
@@ -1236,7 +1248,10 @@ export function MemberDirectory() {
     }
 
     setAccountAction(
-      `delete:${member.membershipId}`,
+      `delete:${
+        member.membershipId ??
+        member.userId
+      }`,
     );
 
     setMenuMemberId(null);
@@ -1254,10 +1269,17 @@ export function MemberDirectory() {
             },
 
             body:
-              JSON.stringify({
-                id:
-                  member.membershipId,
-              }),
+              JSON.stringify(
+                member.membershipId
+                  ? {
+                      id:
+                        member.membershipId,
+                    }
+                  : {
+                      userId:
+                        member.userId,
+                    },
+              ),
           },
         );
 

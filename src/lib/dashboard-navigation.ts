@@ -55,12 +55,11 @@ export const dashboardNavigationItems:
       permission: "members",
     },
     {
-      label: "Contenu du site",
+      label: "Pages",
       href: "/admin/contenu",
       iconKey: "content",
       group: "management",
       permission: "content",
-      disabled: true,
     },
     {
       label: "Images",

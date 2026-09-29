@@ -63,7 +63,7 @@ export const PERMISSION_LABELS: Record<
   members: "Gestion des membres",
   calendar: "Gestion du calendrier",
   resources: "Gestion du répertoire",
-  content: "Contenu du site",
+  content: "Pages du site",
   images: "Images",
   gallery: "Galerie",
   settings: "Paramètres",

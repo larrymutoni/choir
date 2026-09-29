@@ -90,7 +90,7 @@ const permissionRows: Array<{
   },
   {
     key: "content",
-    label: "Contenu du site",
+    label: "Pages du site",
   },
   {
     key: "images",
