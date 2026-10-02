@@ -169,7 +169,10 @@ export async function updateMember(
 }
 
 export async function deleteMember(
-  id: string,
+  target: {
+    id?: string;
+    userId?: string;
+  },
 ) {
   return dbRequest<{
     ok: true;
@@ -177,28 +180,10 @@ export async function deleteMember(
     method: "DELETE",
 
     body:
-      JSON.stringify({
-        id,
-      }),
+      JSON.stringify(
+        target,
+      ),
   });
-}
-
-export async function deleteUnvalidatedMemberUser(
-  userId: string,
-) {
-  return dbRequest<{
-    ok: true;
-  }>(
-    "/v1/members/unvalidated-user",
-    {
-      method: "DELETE",
-
-      body:
-        JSON.stringify({
-          userId,
-        }),
-    },
-  );
 }
 
 export async function approveMemberUser(

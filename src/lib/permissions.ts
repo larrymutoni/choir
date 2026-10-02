@@ -60,12 +60,12 @@ export const PERMISSION_LABELS: Record<
   AdminPermissionKey,
   string
 > = {
-  members: "Gestion des membres",
-  calendar: "Gestion du calendrier",
-  resources: "Gestion du répertoire",
-  content: "Pages du site",
+  members: "Gérer les membres",
+  calendar: "Gérer le calendrier",
+  resources: "Gérer le répertoire",
+  content: "Gérer les pages du site",
   images: "Images",
-  gallery: "Galerie",
+  gallery: "Gérer la galerie",
   settings: "Paramètres",
   events: "Gestion du calendrier",
   admins: "Gestion des membres",
@@ -153,9 +153,7 @@ export function hasAnyManagementPermission(
     subject.permissions?.calendar === true ||
     subject.permissions?.resources === true ||
     subject.permissions?.content === true ||
-    subject.permissions?.images === true ||
-    subject.permissions?.gallery === true ||
-    subject.permissions?.settings === true
+    subject.permissions?.gallery === true
   );
 }
 

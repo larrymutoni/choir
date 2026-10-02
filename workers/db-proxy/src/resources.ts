@@ -8,7 +8,7 @@ type SongRow = {
   lyrics: string | null;
   notes: string | null;
   status: "draft" | "published";
-  created_by_user_id: string;
+  created_by_user_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -27,7 +27,7 @@ type ResourceFileRow = {
   downloadable: number;
   published: number;
   sort_order: number;
-  created_by_user_id: string;
+  created_by_user_id: string | null;
   created_at: string;
   updated_at: string;
 };

@@ -8,7 +8,6 @@ import {
   approveMemberUser,
   createMember,
   deleteMember,
-  deleteUnvalidatedMemberUser,
   listMemberEntries,
   rejectMemberUser,
   updateMember,
@@ -260,6 +259,56 @@ export async function POST(
             status: 400,
           },
         );
+      }
+
+      const entries =
+        await listMemberEntries();
+
+      const target =
+        entries.find(
+          (entry) =>
+            entry.userId ===
+            roleParsed.data.userId,
+        );
+
+      if (
+        target?.role ===
+          "super_admin" &&
+        target.accountStatus ===
+          "active" &&
+        roleParsed.data.role !==
+          "super_admin"
+      ) {
+        const activeSuperAdmins =
+          new Set(
+            entries
+              .filter(
+                (entry) =>
+                  entry.userId &&
+                  entry.role ===
+                    "super_admin" &&
+                  entry.accountStatus ===
+                    "active",
+              )
+              .map(
+                (entry) =>
+                  entry.userId!,
+              ),
+          ).size;
+
+        if (
+          activeSuperAdmins <= 1
+        ) {
+          return NextResponse.json(
+            {
+              message:
+                "Le dernier super administrateur doit conserver ce rôle.",
+            },
+            {
+              status: 400,
+            },
+          );
+        }
       }
 
       await updateMemberAccountRole(
@@ -537,80 +586,19 @@ export async function DELETE(
     const entries =
       await listMemberEntries();
 
-    if (
-      parsed.data.userId &&
-      !parsed.data.id
-    ) {
-      const target =
-        entries.find(
-          (entry) =>
-            entry.userId ===
-            parsed.data.userId,
-        );
-
-      if (!target) {
-        return NextResponse.json(
-          {
-            message:
-              "Membre introuvable.",
-          },
-          {
-            status: 404,
-          },
-        );
-      }
-
-      if (
-        target.userId ===
-        session.user_id
-      ) {
-        return NextResponse.json(
-          {
-            message:
-              "Vous ne pouvez pas supprimer votre propre compte.",
-          },
-          {
-            status: 400,
-          },
-        );
-      }
-
-      if (
-        target.role !==
-          "member" ||
-        ![
-          "pending",
-          "rejected",
-        ].includes(
-          target.accountStatus ??
-            "",
-        )
-      ) {
-        return NextResponse.json(
-          {
-            message:
-              "Seuls les comptes membres non validés peuvent être supprimés ici.",
-          },
-          {
-            status: 403,
-          },
-        );
-      }
-
-      await deleteUnvalidatedMemberUser(
-        parsed.data.userId,
-      );
-
-      return NextResponse.json({
-        ok: true,
-      });
-    }
-
     const target =
       entries.find(
         (entry) =>
-          entry.membershipId ===
-          parsed.data.id,
+          (
+            parsed.data.id &&
+            entry.membershipId ===
+              parsed.data.id
+          ) ||
+          (
+            parsed.data.userId &&
+            entry.userId ===
+              parsed.data.userId
+          ),
       );
 
     if (!target) {
@@ -632,7 +620,7 @@ export async function DELETE(
       return NextResponse.json(
         {
           message:
-            "Vous ne pouvez pas retirer votre propre compte.",
+            "Vous ne pouvez pas supprimer votre propre compte.",
         },
         {
           status: 400,
@@ -649,7 +637,7 @@ export async function DELETE(
       return NextResponse.json(
         {
           message:
-            "Vous ne pouvez pas retirer ce membre.",
+            "Vous ne pouvez pas supprimer ce membre.",
         },
         {
           status: 403,
@@ -657,9 +645,54 @@ export async function DELETE(
       );
     }
 
-    await deleteMember(
-      target.membershipId!,
-    );
+    if (
+      target.userId &&
+      target.role ===
+        "super_admin" &&
+      target.accountStatus ===
+        "active"
+    ) {
+      const activeSuperAdmins =
+        new Set(
+          entries
+            .filter(
+              (entry) =>
+                entry.userId &&
+                entry.role ===
+                  "super_admin" &&
+                entry.accountStatus ===
+                  "active",
+            )
+            .map(
+              (entry) =>
+                entry.userId!,
+            ),
+        ).size;
+
+      if (
+        activeSuperAdmins <= 1
+      ) {
+        return NextResponse.json(
+          {
+            message:
+              "Le dernier super administrateur ne peut pas être supprimé.",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+    }
+
+    await deleteMember({
+      id:
+        target.membershipId ??
+        undefined,
+
+      userId:
+        target.userId ??
+        undefined,
+    });
 
     return NextResponse.json({
       ok: true,

@@ -763,94 +763,178 @@ export async function deleteMember(
   const body =
     await readJson<{
       id?: string;
+      userId?: string;
     }>(request);
 
-  if (!body.id) {
+  if (
+    !body.id &&
+    !body.userId
+  ) {
     return json(
       {
         error:
-          "Member ID is required",
+          "Member or user ID is required",
       },
       400,
     );
   }
 
-  const member =
-    await env.DB.prepare(
-      `
-      SELECT
-        id,
-        email
-      FROM members
-      WHERE id = ?
-      LIMIT 1
-      `,
-    )
-      .bind(body.id)
-      .first<{
-        id: string;
-        email: string;
-      }>();
+  type DeletionTarget = {
+    membership_id: string | null;
+    user_id: string | null;
+    email: string;
+    avatar_key: string | null;
+    role: string | null;
+    status:
+      | "pending"
+      | "active"
+      | "rejected"
+      | null;
+  };
 
-  if (!member) {
+  let target:
+    DeletionTarget | null =
+      null;
+
+  if (body.id) {
+    target =
+      await env.DB.prepare(
+        `
+        SELECT
+          members.id
+            AS membership_id,
+          users.id
+            AS user_id,
+          members.email
+            AS email,
+          users.avatar_key
+            AS avatar_key,
+          roles.name
+            AS role,
+          users.status
+            AS status
+        FROM members
+
+        LEFT JOIN users
+          ON LOWER(users.email) =
+             LOWER(members.email)
+
+        LEFT JOIN roles
+          ON roles.id =
+             users.role_id
+
+        WHERE members.id = ?
+        LIMIT 1
+        `,
+      )
+        .bind(body.id)
+        .first<DeletionTarget>();
+  } else if (body.userId) {
+    target =
+      await env.DB.prepare(
+        `
+        SELECT
+          members.id
+            AS membership_id,
+          users.id
+            AS user_id,
+          users.email
+            AS email,
+          users.avatar_key
+            AS avatar_key,
+          roles.name
+            AS role,
+          users.status
+            AS status
+        FROM users
+
+        JOIN roles
+          ON roles.id =
+             users.role_id
+
+        LEFT JOIN members
+          ON LOWER(members.email) =
+             LOWER(users.email)
+
+        WHERE users.id = ?
+        LIMIT 1
+        `,
+      )
+        .bind(
+          body.userId,
+        )
+        .first<DeletionTarget>();
+  }
+
+  if (!target) {
     return json(
       {
         error:
-          "Member not found",
+          "Member or user not found",
       },
       404,
     );
   }
 
-  const now =
-    new Date().toISOString();
+  if (
+    body.userId &&
+    target.user_id &&
+    body.userId !==
+      target.user_id
+  ) {
+    return json(
+      {
+        error:
+          "Member and user do not match",
+      },
+      400,
+    );
+  }
 
-  await env.DB.batch([
-    /*
-     * Kill active sessions first.
-     */
-    env.DB.prepare(
-      `
-      DELETE FROM sessions
-      WHERE user_id IN (
-        SELECT users.id
+  if (
+    target.user_id &&
+    target.role ===
+      "super_admin" &&
+    target.status ===
+      "active"
+  ) {
+    const row =
+      await env.DB.prepare(
+        `
+        SELECT
+          COUNT(*) AS count
         FROM users
+
         JOIN roles
           ON roles.id =
              users.role_id
-        WHERE LOWER(users.email) =
-              LOWER(?)
-          AND roles.name =
-              'member'
+
+        WHERE roles.name =
+              'super_admin'
+          AND users.status =
+              'active'
+        `,
       )
-      `,
-    ).bind(
-      member.email,
-    ),
+        .first<{
+          count: number;
+        }>();
 
-    /*
-     * Keep the account but revoke access.
-     */
-    env.DB.prepare(
-      `
-      UPDATE users
-      SET
-        status = 'rejected',
-        updated_at = ?
-      WHERE LOWER(email) =
-            LOWER(?)
-        AND role_id = (
-          SELECT id
-          FROM roles
-          WHERE name = 'member'
-          LIMIT 1
-        )
-      `,
-    ).bind(
-      now,
-      member.email,
-    ),
+    if (
+      Number(
+        row?.count ?? 0,
+      ) <= 1
+    ) {
+      return json(
+        {
+          error:
+            "The last super administrator cannot be deleted",
+        },
+        409,
+      );
+    }
+  }
 
+  const statements = [
     env.DB.prepare(
       `
       DELETE FROM emails
@@ -858,102 +942,70 @@ export async function deleteMember(
             LOWER(?)
       `,
     ).bind(
-      member.email,
+      target.email,
     ),
 
     env.DB.prepare(
       `
       DELETE FROM members
-      WHERE id = ?
+      WHERE LOWER(email) =
+            LOWER(?)
       `,
     ).bind(
-      body.id,
+      target.email,
     ),
-  ]);
+  ];
 
-  return json({
-    ok: true,
-  });
-}
+  if (target.user_id) {
+    statements.unshift(
+      env.DB.prepare(
+        `
+        UPDATE gallery_albums
+        SET created_by_user_id = NULL
+        WHERE created_by_user_id = ?
+        `,
+      ).bind(
+        target.user_id,
+      ),
 
-export async function deleteUnvalidatedMemberUser(
-  request: Request,
-  env: Env,
-) {
-  const body =
-    await readJson<{
-      userId?: string;
-    }>(request);
+      env.DB.prepare(
+        `
+        UPDATE gallery_media
+        SET created_by_user_id = NULL
+        WHERE created_by_user_id = ?
+        `,
+      ).bind(
+        target.user_id,
+      ),
+    );
 
-  if (!body.userId) {
-    return json(
-      {
-        error:
-          "User ID is required",
-      },
-      400,
+    statements.push(
+      env.DB.prepare(
+        `
+        DELETE FROM users
+        WHERE id = ?
+        `,
+      ).bind(
+        target.user_id,
+      ),
     );
   }
 
-  const user =
-    await env.DB.prepare(
-      `
-      SELECT
-        users.id,
-        users.status,
-        roles.name AS role
-      FROM users
-      JOIN roles
-        ON roles.id =
-           users.role_id
-      WHERE users.id = ?
-      LIMIT 1
-      `,
-    )
-      .bind(body.userId)
-      .first<{
-        id: string;
-        status:
-          | "pending"
-          | "active"
-          | "rejected";
-        role: string;
-      }>();
-
-  if (!user) {
-    return json(
-      {
-        error:
-          "User not found",
-      },
-      404,
-    );
-  }
+  await env.DB.batch(
+    statements,
+  );
 
   if (
-    user.role !== "member" ||
-    ![
-      "pending",
-      "rejected",
-    ].includes(user.status)
+    target.avatar_key
   ) {
-    return json(
-      {
-        error:
-          "Only unvalidated member accounts can be deleted",
-      },
-      400,
-    );
+    try {
+      await env.PRIVATE_STORAGE.delete(
+        target.avatar_key,
+      );
+    } catch {
+      // Best effort cleanup.
+    }
   }
-
-  await env.DB.prepare(
-    `
-    DELETE FROM users
-    WHERE id = ?
-    `,
-  )
-    .bind(user.id)
-    .run();
 
   return json({
     ok: true,

@@ -67,7 +67,6 @@ import {
   approveMemberUser,
   createMember,
   deleteMember,
-  deleteUnvalidatedMemberUser,
   importMembers,
   listMembers,
   rejectMemberUser,
@@ -289,17 +288,6 @@ export default {
 
       if (request.method === "DELETE" && url.pathname === "/v1/members") {
         return deleteMember(request, env);
-      }
-
-      if (
-        request.method === "DELETE" &&
-        url.pathname ===
-          "/v1/members/unvalidated-user"
-      ) {
-        return deleteUnvalidatedMemberUser(
-          request,
-          env,
-        );
       }
 
       if (
