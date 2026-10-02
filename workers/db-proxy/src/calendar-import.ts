@@ -42,14 +42,80 @@ export async function createImportedCalendarEvents(
     );
   }
 
-  const now = new Date().toISOString();
+  /*
+   * Évite d'abord les doublons présents
+   * plusieurs fois dans le même fichier.
+   */
+  const seen = new Set<string>();
 
-  const ids = body.events.map(() =>
-    crypto.randomUUID(),
+  const uniqueEvents =
+    body.events.filter((event) => {
+      const key =
+        `${event.title.trim().toLowerCase()}|${event.startAt}`;
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+
+      return true;
+    });
+
+  /*
+   * Vérifie ensuite ce qui existe déjà
+   * réellement dans le calendrier.
+   *
+   * Doublon exact =
+   * même titre + même date/heure de début.
+   */
+  const checks = await env.DB.batch(
+    uniqueEvents.map((event) =>
+      env.DB.prepare(
+        `
+          SELECT id
+          FROM calendar_events
+          WHERE LOWER(TRIM(title)) =
+                LOWER(TRIM(?))
+            AND start_at = ?
+          LIMIT 1
+        `,
+      ).bind(
+        event.title,
+        event.startAt,
+      ),
+    ),
   );
 
+  const eventsToInsert =
+    uniqueEvents.filter(
+      (_, index) =>
+        (checks[index]?.results?.length ?? 0) === 0,
+    );
+
+  const skipped =
+    body.events.length -
+    eventsToInsert.length;
+
+  if (eventsToInsert.length === 0) {
+    return json({
+      ok: true,
+      count: 0,
+      skipped,
+      ids: [],
+    });
+  }
+
+  const now =
+    new Date().toISOString();
+
+  const ids =
+    eventsToInsert.map(() =>
+      crypto.randomUUID(),
+    );
+
   const statements =
-    body.events.map(
+    eventsToInsert.map(
       (event, index) =>
         env.DB.prepare(
           `
@@ -94,6 +160,7 @@ export async function createImportedCalendarEvents(
     {
       ok: true,
       count: ids.length,
+      skipped,
       ids,
     },
     201,

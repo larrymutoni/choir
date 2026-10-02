@@ -1,4 +1,4 @@
-import ExcelJS from "exceljs-hardened";
+import { readSheet } from "read-excel-file/node";
 import mammoth from "mammoth";
 import Papa from "papaparse";
 
@@ -27,6 +27,8 @@ type HeaderMap = {
   date?: number;
   title?: number;
   time?: number;
+  startTime?: number;
+  endTime?: number;
   course?: number;
   details?: number;
   event?: number;
@@ -292,6 +294,30 @@ function detectHeader(rows: RawRow[]) {
       }
 
       if (
+        label === "debut" ||
+        label === "heure debut" ||
+        label === "heure de debut" ||
+        label === "start" ||
+        label === "start time"
+      ) {
+        map.startTime = index;
+        score += 2;
+        return;
+      }
+
+      if (
+        label === "fin" ||
+        label === "heure fin" ||
+        label === "heure de fin" ||
+        label === "end" ||
+        label === "end time"
+      ) {
+        map.endTime = index;
+        score += 2;
+        return;
+      }
+
+      if (
         label === "horaire" ||
         label === "horaires" ||
         label === "heure" ||
@@ -400,6 +426,35 @@ function extractTimes(value: string) {
     matches,
     isRange,
   };
+}
+
+function parseTimeCell(cell?: RawCell) {
+  if (!cell) {
+    return "";
+  }
+
+  if (cell.raw instanceof Date) {
+    return normalizeTime(
+      cell.raw.getUTCHours(),
+      cell.raw.getUTCMinutes(),
+    );
+  }
+
+  if (
+    typeof cell.raw === "number" &&
+    cell.raw >= 0 &&
+    cell.raw < 1
+  ) {
+    const totalMinutes =
+      Math.round(cell.raw * 24 * 60) % (24 * 60);
+
+    return normalizeTime(
+      Math.floor(totalMinutes / 60),
+      totalMinutes % 60,
+    );
+  }
+
+  return extractTimes(cell.text).matches[0]?.time ?? "";
 }
 
 function stripTimes(value: string) {
@@ -613,6 +668,26 @@ function rowToEvents(
 
   const dedicatedTime = cellText(row, header?.time);
 
+  const dedicatedStartText =
+    cellText(row, header?.startTime);
+
+  const dedicatedEndText =
+    cellText(row, header?.endTime);
+
+  const structuredTimeColumns =
+    header?.startTime !== undefined ||
+    header?.endTime !== undefined;
+
+  const structuredStartTime =
+    parseTimeCell(
+      row[header?.startTime ?? -1],
+    );
+
+  const structuredEndTime =
+    parseTimeCell(
+      row[header?.endTime ?? -1],
+    );
+
   const detailsText = cellText(row, header?.details);
 
   const eventText = cellText(row, header?.event);
@@ -632,17 +707,26 @@ function rowToEvents(
     )
     .map(({ text }) => text);
 
-  const timeSource = [
-    dedicatedTime,
-    courseText,
-    detailsText,
-    eventText,
-    notesText,
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const timeSource =
+    structuredTimeColumns
+      ? ""
+      : [
+          dedicatedTime,
+          courseText,
+          detailsText,
+          eventText,
+          notesText,
+        ]
+          .filter(Boolean)
+          .join(" ");
 
-  const timeInfo = extractTimes(timeSource);
+  const timeInfo =
+    structuredTimeColumns
+      ? {
+          matches: [],
+          isRange: false,
+        }
+      : extractTimes(timeSource);
 
   const title = chooseTitle({
     explicitTitle,
@@ -650,7 +734,10 @@ function rowToEvents(
     detailsText,
     eventText,
     fallbackTexts,
-    hasTime: timeInfo.matches.length > 0,
+    hasTime:
+      structuredTimeColumns
+        ? Boolean(structuredStartTime)
+        : timeInfo.matches.length > 0,
   });
 
   const notes = buildNotes({
@@ -666,6 +753,63 @@ function rowToEvents(
   )
     ? "Le fichier contient une information incertaine (« ??? ») : à vérifier."
     : null;
+
+  if (structuredTimeColumns) {
+    const warnings: string[] = [];
+
+    let valid = Boolean(
+      title &&
+      dateInfo.date &&
+      structuredStartTime,
+    );
+
+    if (!structuredStartTime) {
+      warnings.push(
+        "Heure de début manquante ou invalide.",
+      );
+    }
+
+    if (
+      dedicatedEndText &&
+      !structuredEndTime
+    ) {
+      valid = false;
+
+      warnings.push(
+        "Heure de fin invalide.",
+      );
+    }
+
+    if (
+      structuredStartTime &&
+      structuredEndTime &&
+      structuredEndTime <= structuredStartTime
+    ) {
+      valid = false;
+
+      warnings.push(
+        "L'heure de fin doit être après l'heure de début.",
+      );
+    }
+
+    return [
+      {
+        id: crypto.randomUUID(),
+        title,
+        date: dateInfo.date,
+        startTime: structuredStartTime,
+        endTime: structuredEndTime,
+        allDay: false,
+        location,
+        notes,
+        valid,
+        warning: mergeWarning(
+          ...warnings,
+          uncertaintyWarning,
+        ),
+      },
+    ];
+  }
 
   if (timeInfo.matches.length === 0) {
     return [
@@ -790,41 +934,23 @@ function textCell(value: unknown): RawCell {
   };
 }
 
-async function parseXlsx(arrayBuffer: ArrayBuffer) {
-  const workbook = new ExcelJS.Workbook();
+async function parseXlsx(
+  arrayBuffer: ArrayBuffer,
+) {
+  const sheet =
+    await readSheet(
+      Buffer.from(arrayBuffer),
+    );
 
-  await workbook.xlsx.load(arrayBuffer);
+  const rows: RawRow[] =
+    sheet.map((row) =>
+      row.map((value) => ({
+        text: clean(value),
+        raw: value,
+      })),
+    );
 
-  const rows: RawRow[] = [];
-
-  workbook.eachSheet((worksheet) => {
-    worksheet.eachRow((row) => {
-      const values: RawCell[] = [];
-
-      row.eachCell(
-        {
-          includeEmpty: true,
-        },
-        (cell, columnNumber) => {
-          values[columnNumber - 1] = {
-            text: clean(cell.text),
-            raw: cell.value,
-          };
-        },
-      );
-
-      rows.push(values);
-    });
-  });
-
-  const date1904 =
-    (
-      workbook.properties as {
-        date1904?: boolean;
-      }
-    ).date1904 === true;
-
-  return rowsToEvents(rows, date1904);
+  return rowsToEvents(rows);
 }
 
 function parseCsv(arrayBuffer: ArrayBuffer) {
