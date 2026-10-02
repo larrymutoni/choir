@@ -3,8 +3,11 @@
 import {
   AlertTriangle,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   FileSpreadsheet,
   Loader2,
+  MapPin,
   Plus,
   Trash2,
   Upload,
@@ -13,20 +16,28 @@ import {
 
 import { useRef, useState } from "react";
 
+type ExistingCalendarEvent = {
+  id: string;
+  title: string;
+  startAt: string;
+  endAt: string | null;
+  location: string | null;
+  notes: string | null;
+};
+
+type DuplicateSource = "calendar" | "file" | null;
+
 type ImportedRow = {
   id: string;
-
   title: string;
   date: string;
-
   startTime: string;
   endTime: string;
-
-  allDay: boolean;
-
   location: string;
   notes: string;
-
+  duplicate: boolean;
+  duplicateSource: DuplicateSource;
+  existingEvent: ExistingCalendarEvent | null;
   warning: string | null;
 };
 
@@ -36,9 +47,11 @@ type ParsedRow = {
   date: string;
   startTime: string;
   endTime: string;
-  allDay: boolean;
   location: string;
   notes: string;
+  duplicate?: boolean;
+  duplicateSource?: DuplicateSource;
+  existingEvent?: ExistingCalendarEvent | null;
   warning: string | null;
 };
 
@@ -51,18 +64,15 @@ type Props = {
 function emptyRow(): ImportedRow {
   return {
     id: crypto.randomUUID(),
-
     title: "",
     date: "",
-
     startTime: "",
     endTime: "",
-
-    allDay: false,
-
     location: "",
     notes: "",
-
+    duplicate: false,
+    duplicateSource: null,
+    existingEvent: null,
     warning: null,
   };
 }
@@ -80,12 +90,11 @@ function rowError(row: ImportedRow) {
     return "Date manquante";
   }
 
-  if (!row.allDay && !row.startTime) {
+  if (!row.startTime) {
     return "Heure de début manquante";
   }
 
   if (
-    !row.allDay &&
     row.startTime &&
     row.endTime &&
     row.endTime <= row.startTime
@@ -108,34 +117,88 @@ async function readError(response: Response) {
   }
 }
 
-export function CalendarImportModal({ open, onClose, onImported }: Props) {
+function formatExistingDate(startAt: string) {
+  return new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Europe/Paris",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(startAt));
+}
+
+function formatExistingTime(value: string) {
+  return new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Europe/Paris",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function existingTimeRange(event: ExistingCalendarEvent) {
+  const start = formatExistingTime(event.startAt);
+
+  if (!event.endAt) {
+    return start;
+  }
+
+  return `${start} – ${formatExistingTime(event.endAt)}`;
+}
+
+export function CalendarImportModal({
+  open,
+  onClose,
+  onImported,
+}: Props) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [fileName, setFileName] = useState("");
-
   const [rows, setRows] = useState<ImportedRow[]>([]);
-
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [parsing, setParsing] = useState(false);
-
   const [importing, setImporting] = useState(false);
-
   const [error, setError] = useState("");
 
   if (!open) {
     return null;
   }
 
-  const invalidCount = rows.filter((row) => Boolean(rowError(row))).length;
+  const duplicateCount = rows.filter((row) => row.duplicate).length;
 
-  const warningCount = rows.filter(
-    (row) => !rowError(row) && Boolean(row.warning),
+  const calendarDuplicateCount = rows.filter(
+    (row) => row.duplicateSource === "calendar",
   ).length;
 
-  const validCount = rows.length - invalidCount;
+  const fileDuplicateCount = rows.filter(
+    (row) => row.duplicateSource === "file",
+  ).length;
+
+  const invalidCount = rows.filter(
+    (row) =>
+      !row.duplicate &&
+      Boolean(rowError(row)),
+  ).length;
+
+  const warningCount = rows.filter(
+    (row) =>
+      !row.duplicate &&
+      !rowError(row) &&
+      Boolean(row.warning),
+  ).length;
+
+  const validCount = rows.filter(
+    (row) =>
+      !row.duplicate &&
+      !rowError(row),
+  ).length;
+
+  const newRows = rows.filter((row) => !row.duplicate);
+  const duplicateRows = rows.filter((row) => row.duplicate);
 
   function reset() {
     setFileName("");
     setRows([]);
+    setExpanded(new Set());
     setError("");
 
     if (fileInputRef.current) {
@@ -166,7 +229,23 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
   }
 
   function deleteRow(id: string) {
-    setRows((current) => current.filter((row) => row.id !== id));
+    setRows((current) =>
+      current.filter((row) => row.id !== id),
+    );
+  }
+
+  function toggleDetails(id: string) {
+    setExpanded((current) => {
+      const next = new Set(current);
+
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+
+      return next;
+    });
   }
 
   async function parseFile(file: File) {
@@ -175,13 +254,15 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
 
     try {
       const formData = new FormData();
-
       formData.append("file", file);
 
-      const response = await fetch("/api/member/calendar/import/parse", {
-        method: "POST",
-        body: formData,
-      });
+      const response = await fetch(
+        "/api/member/calendar/import/parse",
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
 
       if (!response.ok) {
         throw new Error(await readError(response));
@@ -197,21 +278,15 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
       setRows(
         data.events.map((event) => ({
           id: event.id,
-
           title: event.title,
-
           date: event.date,
-
           startTime: event.startTime,
-
           endTime: event.endTime,
-
-          allDay: event.allDay,
-
           location: event.location,
-
           notes: event.notes,
-
+          duplicate: Boolean(event.duplicate),
+          duplicateSource: event.duplicateSource ?? null,
+          existingEvent: event.existingEvent ?? null,
           warning: event.warning,
         })),
       );
@@ -227,13 +302,14 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
   }
 
   async function importRows() {
-    if (importing || rows.length === 0) {
+    if (importing || validCount === 0) {
       return;
     }
 
     if (invalidCount > 0) {
-      setError("Corrigez ou supprimez les lignes invalides avant l'import.");
-
+      setError(
+        "Corrigez ou supprimez les lignes invalides avant l'import.",
+      );
       return;
     }
 
@@ -241,36 +317,43 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
     setError("");
 
     try {
-      const events = rows.map((row) => ({
-        title: row.title.trim(),
+      const events = rows
+        .filter((row) => !row.duplicate)
+        .map((row) => ({
+          title: row.title.trim(),
+          startAt: toIso(row.date, row.startTime),
+          endAt: row.endTime
+            ? toIso(row.date, row.endTime)
+            : null,
+          allDay: false,
+          location: row.location.trim() || null,
+          notes: row.notes.trim() || null,
+        }));
 
-        startAt: row.allDay
-          ? new Date(`${row.date}T00:00:00`).toISOString()
-          : toIso(row.date, row.startTime),
-
-        endAt: !row.allDay && row.endTime ? toIso(row.date, row.endTime) : null,
-
-        allDay: row.allDay,
-
-        location: row.location.trim() || null,
-
-        notes: row.notes.trim() || null,
-      }));
-
-      const response = await fetch("/api/member/calendar/import/commit", {
-        method: "POST",
-
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        "/api/member/calendar/import/commit",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ events }),
         },
-
-        body: JSON.stringify({
-          events,
-        }),
-      });
+      );
 
       if (!response.ok) {
         throw new Error(await readError(response));
+      }
+
+      const result = (await response.json()) as {
+        count?: number;
+      };
+
+      if ((result.count ?? 0) === 0) {
+        setError(
+          "Le calendrier a changé entre-temps. Aucun nouvel événement n'a été enregistré.",
+        );
+        return;
       }
 
       onImported();
@@ -287,10 +370,10 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
   }
 
   const inputClass =
-    "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[16px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 sm:text-sm";
+    "h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200";
 
   return (
-    <div className="fixed inset-0 z-[350] flex items-end justify-center bg-slate-950/30 p-0 backdrop-blur-[2px] sm:items-center sm:p-6">
+    <div className="fixed inset-0 z-[350] flex items-end justify-center bg-slate-950/25 p-0 backdrop-blur-[2px] sm:items-center sm:p-5">
       <button
         type="button"
         aria-label="Fermer"
@@ -301,13 +384,19 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
       <div
         role="dialog"
         aria-modal="true"
-        className="relative z-10 flex max-h-[94vh] w-full flex-col overflow-hidden rounded-t-2xl border border-[#e2e8f0] bg-[#f8fafc] shadow-2xl sm:max-w-6xl sm:rounded-2xl"
+        className="relative z-10 flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-slate-50 shadow-xl sm:max-w-4xl sm:rounded-2xl"
       >
-        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[#e2e8f0] bg-white px-5 py-4 sm:px-6">
+        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-3.5 sm:px-5">
           <div>
-            <h2 className="text-lg font-semibold text-slate-950">
+            <h2 className="text-base font-semibold text-slate-950">
               Importer un planning
             </h2>
+
+            {fileName && (
+              <p className="mt-0.5 max-w-lg truncate text-xs text-slate-500">
+                {fileName}
+              </p>
+            )}
           </div>
 
           <button
@@ -315,18 +404,18 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
             onClick={close}
             disabled={parsing || importing}
             aria-label="Fermer"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#64748b] transition hover:bg-[#f1f5f9] disabled:opacity-50"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 disabled:opacity-50"
           >
-            <X size={19} />
+            <X size={18} />
           </button>
         </header>
 
         {rows.length === 0 ? (
-          <div className="flex-1 overflow-y-auto p-5 sm:p-8">
+          <div className="flex-1 overflow-y-auto p-5 sm:p-6">
             {error && (
               <div
                 role="alert"
-                className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
+                className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm font-medium text-red-700"
               >
                 {error}
               </div>
@@ -350,28 +439,30 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
               type="button"
               disabled={parsing}
               onClick={() => fileInputRef.current?.click()}
-              className="flex min-h-64 w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#cbd5e1] bg-white px-6 py-10 text-center transition hover:border-[#94a3b8] hover:bg-[#f8fafc] disabled:opacity-60"
+              className="flex min-h-48 w-full flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-6 py-8 text-center transition hover:border-slate-400 hover:bg-slate-50 disabled:opacity-60"
             >
               {parsing ? (
                 <>
-                  <Loader2 size={34} className="animate-spin text-[#0f172a]" />
-
-                  <span className="mt-4 font-bold text-[#0f172a]">
+                  <Loader2
+                    size={28}
+                    className="animate-spin text-slate-700"
+                  />
+                  <span className="mt-3 text-sm font-semibold text-slate-800">
                     Analyse du planning…
                   </span>
                 </>
               ) : (
                 <>
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f1f5f9] text-[#0f172a]">
-                    <Upload size={25} />
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                    <Upload size={21} />
                   </div>
 
-                  <span className="mt-4 text-base font-bold text-[#0f172a]">
+                  <span className="mt-3 text-sm font-semibold text-slate-900">
                     Choisir un fichier
                   </span>
 
-                  <span className="mt-2 max-w-md text-sm leading-6 text-[#64748b]">
-                    XLSX, CSV ou DOCX · maximum 10 Mo
+                  <span className="mt-1 text-xs text-slate-500">
+                    XLSX recommandé · CSV ou DOCX acceptés · 10 Mo max
                   </span>
                 </>
               )}
@@ -379,294 +470,470 @@ export function CalendarImportModal({ open, onClose, onImported }: Props) {
           </div>
         ) : (
           <>
-            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 sm:px-6">
-              <div className="flex min-w-0 items-center gap-3">
-                <FileSpreadsheet
-                  size={20}
-                  className="shrink-0 text-[#0f172a]"
-                />
+            <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <FileSpreadsheet
+                    size={18}
+                    className="text-slate-500"
+                  />
 
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-[#0f172a]">
-                    {fileName}
-                  </p>
-
-                  <p className="text-xs text-[#64748b]">
+                  <p className="text-sm font-medium text-slate-700">
                     {rows.length} événement
                     {rows.length > 1 ? "s" : ""} détecté
                     {rows.length > 1 ? "s" : ""}
                   </p>
                 </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {validCount > 0 && (
+                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                      {validCount} nouveau
+                      {validCount > 1 ? "x" : ""}
+                    </span>
+                  )}
+
+                  {calendarDuplicateCount > 0 && (
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                      {calendarDuplicateCount} déjà au calendrier
+                    </span>
+                  )}
+
+                  {fileDuplicateCount > 0 && (
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                      {fileDuplicateCount} en double dans le fichier
+                    </span>
+                  )}
+
+                  {warningCount > 0 && (
+                    <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                      {warningCount} à vérifier
+                    </span>
+                  )}
+
+                  {invalidCount > 0 && (
+                    <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
+                      {invalidCount} invalide
+                      {invalidCount > 1 ? "s" : ""}
+                    </span>
+                  )}
+                </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                {invalidCount > 0 ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700">
-                    <AlertTriangle size={14} />
-                    {invalidCount} invalide
-                    {invalidCount > 1 ? "s" : ""}
-                  </span>
-                ) : warningCount > 0 ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
-                    <AlertTriangle size={14} />
-                    {warningCount} à vérifier
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#ecfdf5] px-3 py-1.5 text-xs font-bold text-[#047857]">
-                    <CheckCircle2 size={14} />
-                    Tout est prêt
-                  </span>
+              {validCount === 0 &&
+                duplicateCount > 0 &&
+                invalidCount === 0 && (
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    Tous les événements de ce fichier sont déjà enregistrés.
+                    Vous pouvez consulter les correspondances ci-dessous ou
+                    choisir un autre fichier.
+                  </p>
                 )}
 
+              <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={reset}
                   disabled={importing}
-                  className="min-h-10 rounded-xl border border-[#e2e8f0] bg-white px-3 text-sm font-bold text-[#475569] transition hover:bg-[#f8fafc]"
+                  className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
                 >
                   Autre fichier
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setRows((current) => [...current, emptyRow()])}
+                  onClick={() =>
+                    setRows((current) => [
+                      ...current,
+                      emptyRow(),
+                    ])
+                  }
                   disabled={importing}
-                  className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#e2e8f0] bg-white px-3 text-sm font-bold text-[#334155] transition hover:bg-[#f8fafc]"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
                 >
-                  <Plus size={15} />
+                  <Plus size={13} />
                   Ajouter une ligne
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
-              <div className="divide-y divide-[#e2e8f0]">
-                {rows.map((row, index) => {
-                  const validation = rowError(row);
+            <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+              <div className="space-y-5">
+                {newRows.length > 0 && (
+                  <section>
+                    <div className="mb-2 flex items-center justify-between">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Nouveaux événements
+                      </h3>
 
-                  return (
-                    <div key={row.id} className="bg-white px-4 py-5 sm:px-6">
-                      <div className="mb-4 flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-wide text-[#94a3b8]">
-                            Événement {index + 1}
-                          </p>
-
-                          {validation ? (
-                            <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-red-700">
-                              <AlertTriangle size={13} />
-                              {validation}
-                            </p>
-                          ) : row.warning ? (
-                            <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-amber-700">
-                              <AlertTriangle size={13} />À vérifier
-                            </p>
-                          ) : (
-                            <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-[#047857]">
-                              <CheckCircle2 size={13} />
-                              Prêt
-                            </p>
-                          )}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => deleteRow(row.id)}
-                          disabled={importing}
-                          aria-label={`Supprimer l'événement ${index + 1}`}
-                          className="flex h-10 w-10 items-center justify-center rounded-xl text-red-600 transition hover:bg-red-50 disabled:opacity-50"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-
-                      {row.warning && (
-                        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-medium leading-5 text-amber-800">
-                          {row.warning}
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
-                        <div className="md:col-span-5">
-                          <label className="mb-1.5 block text-xs font-bold text-[#475569]">
-                            Titre
-                          </label>
-
-                          <input
-                            value={row.title}
-                            maxLength={120}
-                            onChange={(event) =>
-                              updateRow(row.id, {
-                                title: event.target.value,
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </div>
-
-                        <div className="md:col-span-3">
-                          <label className="mb-1.5 block text-xs font-bold text-[#475569]">
-                            Date
-                          </label>
-
-                          <input
-                            type="date"
-                            value={row.date}
-                            onChange={(event) =>
-                              updateRow(row.id, {
-                                date: event.target.value,
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </div>
-
-                        <div className="flex items-end md:col-span-4">
-                          <label className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 text-sm font-semibold text-[#475569]">
-                            <input
-                              type="checkbox"
-                              checked={row.allDay}
-                              onChange={(event) =>
-                                updateRow(row.id, {
-                                  allDay: event.target.checked,
-                                })
-                              }
-                              className="h-4 w-4 accent-[#0f172a]"
-                            />
-                            Toute la journée
-                          </label>
-                        </div>
-
-                        {!row.allDay && (
-                          <>
-                            <div className="md:col-span-3">
-                              <label className="mb-1.5 block text-xs font-bold text-[#475569]">
-                                Début
-                              </label>
-
-                              <input
-                                type="time"
-                                value={row.startTime}
-                                onChange={(event) =>
-                                  updateRow(row.id, {
-                                    startTime: event.target.value,
-                                  })
-                                }
-                                className={inputClass}
-                              />
-                            </div>
-
-                            <div className="md:col-span-3">
-                              <label className="mb-1.5 block text-xs font-bold text-[#475569]">
-                                Fin
-                              </label>
-
-                              <input
-                                type="time"
-                                value={row.endTime}
-                                onChange={(event) =>
-                                  updateRow(row.id, {
-                                    endTime: event.target.value,
-                                  })
-                                }
-                                className={inputClass}
-                              />
-                            </div>
-                          </>
-                        )}
-
-                        <div
-                          className={
-                            row.allDay ? "md:col-span-12" : "md:col-span-6"
-                          }
-                        >
-                          <label className="mb-1.5 block text-xs font-bold text-[#475569]">
-                            Lieu
-                          </label>
-
-                          <input
-                            value={row.location}
-                            maxLength={200}
-                            onChange={(event) =>
-                              updateRow(row.id, {
-                                location: event.target.value,
-                              })
-                            }
-                            placeholder="Facultatif"
-                            className={inputClass}
-                          />
-                        </div>
-
-                        <div className="md:col-span-12">
-                          <label className="mb-1.5 block text-xs font-bold text-[#475569]">
-                            Notes
-                          </label>
-
-                          <textarea
-                            rows={2}
-                            value={row.notes}
-                            maxLength={5000}
-                            onChange={(event) =>
-                              updateRow(row.id, {
-                                notes: event.target.value,
-                              })
-                            }
-                            placeholder="Facultatif"
-                            className={`${inputClass} resize-none`}
-                          />
-                        </div>
-                      </div>
+                      <span className="text-xs text-slate-400">
+                        Modifiables avant l'import
+                      </span>
                     </div>
-                  );
-                })}
+
+                    <div className="space-y-2.5">
+                      {newRows.map((row, index) => {
+                        const validation = rowError(row);
+
+                        return (
+                          <div
+                            key={row.id}
+                            className="rounded-xl border border-slate-200 bg-white p-3"
+                          >
+                            <div className="mb-3 flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                                    Nouveau
+                                  </span>
+
+                                  {validation ? (
+                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700">
+                                      <AlertTriangle size={12} />
+                                      {validation}
+                                    </span>
+                                  ) : row.warning ? (
+                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700">
+                                      <AlertTriangle size={12} />
+                                      À vérifier
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+                                      <CheckCircle2 size={12} />
+                                      Prêt
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => deleteRow(row.id)}
+                                disabled={importing}
+                                aria-label={`Supprimer l'événement ${index + 1}`}
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+
+                            {row.warning && (
+                              <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+                                {row.warning}
+                              </div>
+                            )}
+
+                            <div className="grid grid-cols-1 gap-2.5 md:grid-cols-12">
+                              <div className="md:col-span-5">
+                                <label className="mb-1 block text-[11px] font-semibold text-slate-500">
+                                  Titre
+                                </label>
+                                <input
+                                  value={row.title}
+                                  maxLength={120}
+                                  onChange={(event) =>
+                                    updateRow(row.id, {
+                                      title: event.target.value,
+                                    })
+                                  }
+                                  className={inputClass}
+                                />
+                              </div>
+
+                              <div className="md:col-span-3">
+                                <label className="mb-1 block text-[11px] font-semibold text-slate-500">
+                                  Date
+                                </label>
+                                <input
+                                  type="date"
+                                  value={row.date}
+                                  onChange={(event) =>
+                                    updateRow(row.id, {
+                                      date: event.target.value,
+                                    })
+                                  }
+                                  className={inputClass}
+                                />
+                              </div>
+
+                              <div className="md:col-span-2">
+                                <label className="mb-1 block text-[11px] font-semibold text-slate-500">
+                                  Début
+                                </label>
+                                <input
+                                  type="time"
+                                  value={row.startTime}
+                                  onChange={(event) =>
+                                    updateRow(row.id, {
+                                      startTime: event.target.value,
+                                    })
+                                  }
+                                  className={inputClass}
+                                />
+                              </div>
+
+                              <div className="md:col-span-2">
+                                <label className="mb-1 block text-[11px] font-semibold text-slate-500">
+                                  Fin
+                                </label>
+                                <input
+                                  type="time"
+                                  value={row.endTime}
+                                  onChange={(event) =>
+                                    updateRow(row.id, {
+                                      endTime: event.target.value,
+                                    })
+                                  }
+                                  className={inputClass}
+                                />
+                              </div>
+
+                              <div className="md:col-span-5">
+                                <label className="mb-1 block text-[11px] font-semibold text-slate-500">
+                                  Lieu
+                                </label>
+                                <input
+                                  value={row.location}
+                                  maxLength={200}
+                                  onChange={(event) =>
+                                    updateRow(row.id, {
+                                      location: event.target.value,
+                                    })
+                                  }
+                                  placeholder="Facultatif"
+                                  className={inputClass}
+                                />
+                              </div>
+
+                              <div className="md:col-span-7">
+                                <label className="mb-1 block text-[11px] font-semibold text-slate-500">
+                                  Notes
+                                </label>
+                                <input
+                                  value={row.notes}
+                                  maxLength={5000}
+                                  onChange={(event) =>
+                                    updateRow(row.id, {
+                                      notes: event.target.value,
+                                    })
+                                  }
+                                  placeholder="Facultatif"
+                                  className={inputClass}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
+
+                {duplicateRows.length > 0 && (
+                  <section>
+                    <div className="mb-2 flex items-center justify-between">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Déjà enregistrés
+                      </h3>
+
+                      <span className="text-xs text-slate-400">
+                        Non réimportés
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {duplicateRows.map((row) => {
+                        const isOpen = expanded.has(row.id);
+                        const existing = row.existingEvent;
+
+                        return (
+                          <div
+                            key={row.id}
+                            className="overflow-hidden rounded-xl border border-slate-200 bg-white"
+                          >
+                            <div className="flex items-center gap-3 px-3 py-2.5">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="truncate text-sm font-semibold text-slate-800">
+                                    {row.title}
+                                  </p>
+
+                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                                    {row.duplicateSource === "file"
+                                      ? "Doublon dans le fichier"
+                                      : "Déjà dans le calendrier"}
+                                  </span>
+                                </div>
+
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {row.date}
+                                  {row.startTime
+                                    ? ` · ${row.startTime}${
+                                        row.endTime
+                                          ? ` – ${row.endTime}`
+                                          : ""
+                                      }`
+                                    : ""}
+                                  {row.location
+                                    ? ` · ${row.location}`
+                                    : ""}
+                                </p>
+                              </div>
+
+                              {existing && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleDetails(row.id)}
+                                  className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100"
+                                >
+                                  {isOpen ? (
+                                    <>
+                                      Masquer
+                                      <ChevronUp size={13} />
+                                    </>
+                                  ) : (
+                                    <>
+                                      Voir l'existant
+                                      <ChevronDown size={13} />
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+
+                            {row.duplicateSource === "file" && (
+                              <div className="border-t border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                                Le même titre, la même date et la même heure
+                                apparaissent déjà plus haut dans ce fichier.
+                              </div>
+                            )}
+
+                            {existing && isOpen && (
+                              <div className="border-t border-slate-100 bg-slate-50 px-3 py-3">
+                                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                  Événement actuellement enregistré
+                                </p>
+
+                                <div className="grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
+                                  <div>
+                                    <span className="font-semibold text-slate-700">
+                                      Date et heure
+                                    </span>
+                                    <p className="mt-0.5">
+                                      {formatExistingDate(existing.startAt)}
+                                      {" · "}
+                                      {existingTimeRange(existing)}
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    <span className="font-semibold text-slate-700">
+                                      Lieu
+                                    </span>
+                                    <p className="mt-0.5 flex items-center gap-1">
+                                      {existing.location ? (
+                                        <>
+                                          <MapPin size={12} />
+                                          {existing.location}
+                                        </>
+                                      ) : (
+                                        "Non renseigné"
+                                      )}
+                                    </p>
+                                  </div>
+
+                                  {existing.notes && (
+                                    <div className="sm:col-span-2">
+                                      <span className="font-semibold text-slate-700">
+                                        Notes
+                                      </span>
+                                      <p className="mt-0.5 leading-5">
+                                        {existing.notes}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
               </div>
             </div>
 
-            <footer className="shrink-0 border-t border-[#e2e8f0] bg-white px-4 py-4 sm:px-6">
+            <footer className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 sm:px-5">
               {error && (
                 <div
                   role="alert"
-                  className="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
+                  className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700"
                 >
                   {error}
                 </div>
               )}
 
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-[#64748b]">
-                  <strong className="text-[#0f172a]">{validCount}</strong>{" "}
-                  événement
-                  {validCount > 1 ? "s" : ""} prêt
-                  {validCount > 1 ? "s" : ""} à être ajouté
-                  {validCount > 1 ? "s" : ""}
+                <p className="text-xs text-slate-500">
+                  {validCount > 0 ? (
+                    <>
+                      <strong className="text-slate-800">
+                        {validCount}
+                      </strong>{" "}
+                      nouvel événement
+                      {validCount > 1 ? "s" : ""} sera
+                      {validCount > 1 ? "ont" : ""} ajouté
+                      {validCount > 1 ? "s" : ""}.
+                    </>
+                  ) : duplicateCount > 0 ? (
+                    "Le fichier ne contient rien de nouveau à importer."
+                  ) : (
+                    "Corrigez les événements avant de continuer."
+                  )}
                 </p>
 
                 <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={close}
-                    disabled={importing}
-                    className="min-h-11 rounded-xl border border-[#e2e8f0] bg-white px-4 text-sm font-bold text-[#475569]"
-                  >
-                    Annuler
-                  </button>
+                  {validCount > 0 ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={close}
+                        disabled={importing}
+                        className="h-9 rounded-lg border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                      >
+                        Annuler
+                      </button>
 
-                  <button
-                    type="button"
-                    onClick={importRows}
-                    disabled={
-                      importing || rows.length === 0 || invalidCount > 0
-                    }
-                    className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0f172a] px-5 text-sm font-bold text-white transition hover:bg-[#1e293b] disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {importing && (
-                      <Loader2 size={16} className="animate-spin" />
-                    )}
+                      <button
+                        type="button"
+                        onClick={importRows}
+                        disabled={importing || invalidCount > 0}
+                        className="inline-flex h-9 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {importing && (
+                          <Loader2
+                            size={14}
+                            className="animate-spin"
+                          />
+                        )}
 
-                    {importing
-                      ? "Ajout…"
-                      : `Ajouter ${rows.length} événement${rows.length > 1 ? "s" : ""}`}
-                  </button>
+                        {importing
+                          ? "Ajout…"
+                          : `Ajouter ${validCount} événement${
+                              validCount > 1 ? "s" : ""
+                            }`}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={close}
+                      className="h-9 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
+                    >
+                      Fermer
+                    </button>
+                  )}
                 </div>
               </div>
             </footer>

@@ -1,4 +1,4 @@
-import ExcelJS from "exceljs-hardened";
+import { readSheet } from "read-excel-file/node";
 import Papa from "papaparse";
 
 export type ParsedMember = {
@@ -481,61 +481,33 @@ function parseRows(
 async function parseXlsx(
   file: File,
 ) {
-  const workbook =
-    new ExcelJS.Workbook();
+  try {
+    const buffer =
+      Buffer.from(
+        await file.arrayBuffer(),
+      );
 
-  const buffer =
-    Buffer.from(
-      await file.arrayBuffer(),
+    const sheet =
+      await readSheet(buffer);
+
+    const rows: RawRow[] =
+      sheet.map((row) =>
+        row.map((value) =>
+          cellToString(value),
+        ),
+      );
+
+    return parseRows(rows);
+  } catch (error) {
+    console.error(
+      "Members XLSX parse:",
+      error,
     );
 
-  await workbook.xlsx.load(
-    buffer,
-  );
-
-  const worksheet =
-    workbook.worksheets[0];
-
-  if (!worksheet) {
-    return [];
+    throw new Error(
+      "Le fichier Excel n'a pas pu être lu. Vérifiez qu'il s'agit bien d'un fichier .xlsx valide.",
+    );
   }
-
-  const rows: RawRow[] =
-    [];
-
-  worksheet.eachRow(
-    {
-      includeEmpty: false,
-    },
-    (row) => {
-      const values:
-        string[] = [];
-
-      const maxColumn =
-        Math.max(
-          row.cellCount,
-          worksheet.columnCount,
-        );
-
-      for (
-        let column = 1;
-        column <= maxColumn;
-        column += 1
-      ) {
-        values.push(
-          cellToString(
-            row.getCell(
-              column,
-            ).value,
-          ),
-        );
-      }
-
-      rows.push(values);
-    },
-  );
-
-  return parseRows(rows);
 }
 
 async function parseCsv(
