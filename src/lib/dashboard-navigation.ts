@@ -48,6 +48,12 @@ export const dashboardNavigationItems:
       group: "main",
     },
     {
+      label: "Galerie",
+      href: "/membre/galerie",
+      iconKey: "siteGallery",
+      group: "main",
+    },
+    {
       label: "Membres",
       href: "/admin/utilisateurs",
       iconKey: "members",
@@ -55,12 +61,11 @@ export const dashboardNavigationItems:
       permission: "members",
     },
     {
-      label: "Contenu du site",
+      label: "Pages",
       href: "/admin/contenu",
       iconKey: "content",
       group: "management",
       permission: "content",
-      disabled: true,
     },
     {
       label: "Images",
@@ -71,15 +76,7 @@ export const dashboardNavigationItems:
       disabled: true,
     },
     {
-      label: "Galerie",
-      href: "/admin/galerie",
-      iconKey: "siteGallery",
-      group: "management",
-      permission: "gallery",
-      disabled: true,
-    },
-    {
-      label: "Paramètres",
+      label: "Paramètres du site",
       href: "/admin/settings",
       iconKey: "settings",
       group: "management",
@@ -94,6 +91,11 @@ export function getDashboardNavigation(
 ) {
   return dashboardNavigationItems.filter(
     (item) => {
+      // A disabled item must not be shown to anyone, including super_admin.
+      if (item.disabled === true) {
+        return false;
+      }
+
       if (!item.permission) {
         return true;
       }

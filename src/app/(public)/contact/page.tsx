@@ -6,6 +6,7 @@ import { ContactForm } from "@/components/public/ContactForm";
 import { contentArrayToMap } from "@/lib/content";
 import { getSupabaseImageUrl } from "@/lib/images";
 import { createClient } from "@/lib/supabase/server";
+import { listSiteContent } from "@/server/content/repository";
 
 type ContactPerson = {
   id: string;
@@ -20,12 +21,12 @@ export default async function ContactPage() {
   const supabase = await createClient();
 
   const [
-    { data: siteContent },
+    siteContent,
     { data: siteImages },
     { data: contactSettings },
     { data: contactPeople },
   ] = await Promise.all([
-    supabase.from("site_content").select("key, value"),
+    listSiteContent(),
     supabase.from("site_images").select("key, path, alt_text, updated_at"),
     supabase
       .from("contact_settings")
@@ -59,6 +60,10 @@ export default async function ContactPage() {
   const contactImageUrl = contactImage
     ? getSupabaseImageUrl(contactImage.path, contactImage.updated_at)
     : "https://images.unsplash.com/photo-1516280440614-37939bbacd81?q=80&w=1200&auto=format&fit=crop";
+
+  const contactTitle =
+    content.contact_title ||
+    "Écrire à la chorale.";
 
   const contactIntro =
     content.contact_intro ||
@@ -96,7 +101,7 @@ export default async function ContactPage() {
               <p className="eyebrow">Contact</p>
 
               <h1 className="editorial-title mt-5 max-w-3xl text-5xl leading-tight text-[#1f1f1a] sm:text-6xl">
-                Écrire à la chorale.
+                {contactTitle}
               </h1>
 
               <p className="mt-6 max-w-xl text-base leading-8 text-[#6d6b63] sm:text-lg">

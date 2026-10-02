@@ -78,31 +78,23 @@ const permissionRows: Array<{
 }> = [
   {
     key: "members",
-    label: "Membres",
+    label: "Gérer les membres",
   },
   {
     key: "calendar",
-    label: "Calendrier",
+    label: "Gérer le calendrier",
   },
   {
     key: "resources",
-    label: "Répertoire",
+    label: "Gérer le répertoire",
   },
   {
     key: "content",
-    label: "Contenu du site",
-  },
-  {
-    key: "images",
-    label: "Images",
+    label: "Gérer les pages du site",
   },
   {
     key: "gallery",
-    label: "Galerie",
-  },
-  {
-    key: "settings",
-    label: "Paramètres",
+    label: "Gérer la galerie",
   },
 ];
 
@@ -141,7 +133,7 @@ function permissionSummary(
       );
 
   if (enabled.length === 0) {
-    return "Aucun accès";
+    return "Aucune permission de gestion";
   }
 
   return enabled.join(" · ");
@@ -349,6 +341,12 @@ export function RoleManagementModal({
 
       let body: unknown;
 
+      const permissionsToSave: Permissions = {
+        ...permissions,
+        images: false,
+        settings: false,
+      };
+
       if (
         editor.type ===
         "new"
@@ -359,7 +357,7 @@ export function RoleManagementModal({
           name:
             name.trim(),
 
-          permissions,
+          permissions: permissionsToSave,
         };
       } else if (
         editor.type ===
@@ -374,7 +372,7 @@ export function RoleManagementModal({
           id:
             editor.role.id,
 
-          permissions,
+          permissions: permissionsToSave,
         };
       } else {
         method = "PATCH";
@@ -389,7 +387,7 @@ export function RoleManagementModal({
           name:
             name.trim(),
 
-          permissions,
+          permissions: permissionsToSave,
         };
       }
 
@@ -581,7 +579,9 @@ export function RoleManagementModal({
               <div className="space-y-3">
                 {systemRoles.map(
                   (role) => {
-                    const protectedRole = false;
+                    const protectedRole =
+                      role.id ===
+                      "super_admin";
 
                     return (
                       <div

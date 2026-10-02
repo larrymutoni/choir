@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+
 import { requirePermission } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { updateSiteContent } from "@/server/content/repository";
 
 const updateContentSchema = z.object({
   items: z.array(
@@ -20,30 +21,35 @@ export async function PUT(request: Request) {
 
   if (!parsed.success) {
     return NextResponse.json(
-      { message: "Invalid content data." },
-      { status: 400 },
+      {
+        message: "Données de contenu invalides.",
+      },
+      {
+        status: 400,
+      },
     );
   }
 
-  const supabase = createAdminClient();
+  try {
+    await updateSiteContent(
+      parsed.data.items,
+    );
 
-  const updates = parsed.data.items.map((item) =>
-    supabase
-      .from("site_content")
-      .update({ value: item.value })
-      .eq("key", item.key),
-  );
+    return NextResponse.json({
+      ok: true,
+      message: "Contenu enregistré.",
+    });
+  } catch (error) {
+    console.error(error);
 
-  const results = await Promise.all(updates);
-
-  const error = results.find((result) => result.error)?.error;
-
-  if (error) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
+    return NextResponse.json(
+      {
+        message:
+          "Impossible d’enregistrer le contenu.",
+      },
+      {
+        status: 500,
+      },
+    );
   }
-
-  return NextResponse.json({
-    ok: true,
-    message: "Content updated successfully.",
-  });
 }

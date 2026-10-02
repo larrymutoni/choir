@@ -169,7 +169,10 @@ export async function updateMember(
 }
 
 export async function deleteMember(
-  id: string,
+  target: {
+    id?: string;
+    userId?: string;
+  },
 ) {
   return dbRequest<{
     ok: true;
@@ -177,9 +180,9 @@ export async function deleteMember(
     method: "DELETE",
 
     body:
-      JSON.stringify({
-        id,
-      }),
+      JSON.stringify(
+        target,
+      ),
   });
 }
 

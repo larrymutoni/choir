@@ -213,9 +213,8 @@ export async function listCustomRoles(
         custom_roles.id
 
       ORDER BY
-        LOWER(
-          custom_roles.name
-        )
+        custom_roles.created_at ASC,
+        LOWER(custom_roles.name) ASC
       `,
     ).all<CustomRoleRow>();
 
@@ -431,7 +430,8 @@ export async function updateCustomRole(
     "system"
   ) {
     if (
-      body.id !== "admin"
+      body.id ===
+      "super_admin"
     ) {
       return json(
         {

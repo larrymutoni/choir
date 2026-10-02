@@ -6,12 +6,13 @@ import { Reveal } from "@/components/ui/Reveal";
 import { createClient } from "@/lib/supabase/server";
 import { contentArrayToMap } from "@/lib/content";
 import { getSupabaseImageUrl } from "@/lib/images";
+import { listSiteContent } from "@/server/content/repository";
 
 export default async function HomePage() {
   const supabase = await createClient();
 
-  const [{ data: siteContent }, { data: siteImages }] = await Promise.all([
-    supabase.from("site_content").select("key, value"),
+  const [siteContent, { data: siteImages }] = await Promise.all([
+    listSiteContent(),
     supabase.from("site_images").select("key, path, alt_text, updated_at"),
   ]);
 
@@ -50,6 +51,26 @@ export default async function HomePage() {
 
   const quote =
     content.home_quote || "Développer le lien social par le chant choral.";
+
+  const spiritEyebrow =
+    content.home_spirit_eyebrow ||
+    "L’esprit du groupe";
+
+  const spiritTitle =
+    content.home_spirit_title ||
+    "Chanter, écouter, partager.";
+
+  const spiritText =
+    content.home_spirit_text ||
+    "Une chorale, c’est plus qu’une répétition : c’est un rendez-vous régulier, une énergie collective et le plaisir d’entendre les voix se construire ensemble.";
+
+  const spiritGroupText =
+    content.home_spirit_group_text ||
+    "Un groupe accueillant";
+
+  const spiritRepertoireText =
+    content.home_spirit_repertoire_text ||
+    "Un répertoire vivant";
 
   const homeHeroImage = imageMap.home_hero;
 
@@ -123,14 +144,12 @@ export default async function HomePage() {
 
                 <div className="grid content-between gap-8 p-8 sm:p-10 lg:p-12">
                   <div>
-                    <p className="eyebrow">L’esprit du groupe</p>
+                    <p className="eyebrow">{spiritEyebrow}</p>
                     <h3 className="editorial-title mt-3 text-3xl leading-tight text-[#1f1f1a]">
-                      Chanter, écouter, partager.
+                      {spiritTitle}
                     </h3>
                     <p className="mt-4 leading-8 text-[#6d6b63]">
-                      Une chorale, c’est plus qu’une répétition : c’est un
-                      rendez-vous régulier, une énergie collective et le plaisir
-                      d’entendre les voix se construire ensemble.
+                      {spiritText}
                     </p>
                   </div>
 
@@ -138,14 +157,14 @@ export default async function HomePage() {
                     <div className="rounded-2xl bg-[#f3f0e8] p-4">
                       <Users size={22} className="text-[#687a5e]" />
                       <p className="mt-3 text-sm font-semibold text-[#1f1f1a]">
-                        Un groupe accueillant
+                        {spiritGroupText}
                       </p>
                     </div>
 
                     <div className="rounded-2xl bg-[#f3f0e8] p-4">
                       <Music2 size={22} className="text-[#687a5e]" />
                       <p className="mt-3 text-sm font-semibold text-[#1f1f1a]">
-                        Un répertoire vivant
+                        {spiritRepertoireText}
                       </p>
                     </div>
                   </div>

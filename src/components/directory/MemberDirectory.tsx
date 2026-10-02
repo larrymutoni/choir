@@ -109,7 +109,7 @@ const emptyForm: MemberForm = {
     "system:member",
 };
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 
 function normalizeEmail(
   value: string,
@@ -687,7 +687,9 @@ export function MemberDirectory() {
           (member) =>
             member.userId &&
             member.role ===
-              "super_admin",
+              "super_admin" &&
+            member.accountStatus ===
+              "active",
         ).length,
       [members],
     );
@@ -908,16 +910,41 @@ export function MemberDirectory() {
     member: MemberEntry,
   ) {
     if (
-      !canEditTarget(
-        member,
-      )
+      !canManage ||
+      member.userId ===
+        currentUserId
     ) {
       return false;
     }
 
+    if (
+      member.userId &&
+      member.role ===
+        "super_admin" &&
+      member.accountStatus ===
+        "active" &&
+      superAdminCount <= 1
+    ) {
+      return false;
+    }
+
+    if (
+      canManageSuperAdminRoles
+    ) {
+      return true;
+    }
+
+    if (canManageRoles) {
+      return (
+        member.role !==
+        "super_admin"
+      );
+    }
+
     return (
-      member.userId !==
-      currentUserId
+      member.role ===
+        "member" &&
+      !member.customRoleId
     );
   }
 
@@ -1218,25 +1245,56 @@ export function MemberDirectory() {
     }
   }
 
+  function removalConfirmation(
+    member: MemberEntry,
+  ) {
+    const status =
+      statusOf(member);
+
+    if (
+      status === "pending"
+    ) {
+      return `Supprimer définitivement la demande d'inscription de ${fullName(member)} ?`;
+    }
+
+    if (
+      status === "rejected"
+    ) {
+      return `Supprimer définitivement ${fullName(member)} ? Cette personne pourra ensuite s'inscrire de nouveau avec la même adresse email.`;
+    }
+
+    if (!member.userId) {
+      return `Supprimer ${fullName(member)} de la liste des membres ?`;
+    }
+
+    return `Supprimer définitivement ${fullName(member)} ? Son compte et son accès seront supprimés. Les contenus déjà créés seront conservés.`;
+  }
+
   async function removeMember(
     member: MemberEntry,
   ) {
     if (
-      !member.membershipId
+      !member.membershipId &&
+      !member.userId
     ) {
       return;
     }
 
     if (
       !window.confirm(
-        `Retirer ${fullName(member)} de la chorale ? Son accès au compte sera également révoqué.`,
+        removalConfirmation(
+          member,
+        ),
       )
     ) {
       return;
     }
 
     setAccountAction(
-      `delete:${member.membershipId}`,
+      `delete:${
+        member.membershipId ??
+        member.userId
+      }`,
     );
 
     setMenuMemberId(null);
@@ -1256,7 +1314,12 @@ export function MemberDirectory() {
             body:
               JSON.stringify({
                 id:
-                  member.membershipId,
+                  member.membershipId ??
+                  undefined,
+
+                userId:
+                  member.userId ??
+                  undefined,
               }),
           },
         );
@@ -1274,13 +1337,13 @@ export function MemberDirectory() {
       await loadMembers();
 
       showToast(
-        "Membre retiré",
+        "Membre supprimé",
       );
     } catch (cause) {
       showToast(
         cause instanceof Error
           ? cause.message
-          : "Impossible de retirer ce membre.",
+          : "Impossible de supprimer ce membre.",
         "error",
       );
     } finally {
@@ -1925,7 +1988,7 @@ export function MemberDirectory() {
                                     <Trash2
                                       size={15}
                                     />
-                                    Retirer
+                                    Supprimer
                                   </button>
                                 )}
                               </div>
@@ -2345,7 +2408,7 @@ export function MemberDirectory() {
                     <Trash2
                       size={15}
                     />
-                    Retirer
+                    Supprimer
                   </button>
                 )}
               </div>

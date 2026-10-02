@@ -127,6 +127,10 @@ export async function consumePasswordResetToken(request: Request, env: Env) {
     ).bind(now, body.tokenId),
 
     env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(body.userId),
+
+    env.DB.prepare("DELETE FROM trusted_devices WHERE user_id = ?").bind(
+      body.userId,
+    ),
   ]);
 
   return json({ ok: true });

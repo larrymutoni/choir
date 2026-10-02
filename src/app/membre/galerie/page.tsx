@@ -1,8 +1,6 @@
-import { redirect } from "next/navigation";
-
 import {
-  ComingSoon,
-} from "@/components/dashboard/ComingSoon";
+  GalleryView,
+} from "@/components/gallery/GalleryView";
 
 import {
   hasRolePermission,
@@ -12,23 +10,31 @@ import {
   requireUser,
 } from "@/server/auth/guard";
 
-export default async function MemberGalleryPage() {
+import {
+  listGallery,
+} from "@/server/gallery/repository";
+
+export default async function GalleryPage() {
   const user =
     await requireUser();
 
-  if (
-    !hasRolePermission(
-      user,
-      "gallery",
-    )
-  ) {
-    redirect("/membre");
-  }
+  const gallery =
+    await listGallery();
 
   return (
-    <ComingSoon
-      title="Galerie membres"
-      description="La galerie privée des membres sera disponible ici."
+    <GalleryView
+      albums={
+        gallery.albums
+      }
+      media={
+        gallery.media
+      }
+      canManage={
+        hasRolePermission(
+          user,
+          "gallery",
+        )
+      }
     />
   );
 }

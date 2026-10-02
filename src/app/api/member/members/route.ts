@@ -261,6 +261,56 @@ export async function POST(
         );
       }
 
+      const entries =
+        await listMemberEntries();
+
+      const target =
+        entries.find(
+          (entry) =>
+            entry.userId ===
+            roleParsed.data.userId,
+        );
+
+      if (
+        target?.role ===
+          "super_admin" &&
+        target.accountStatus ===
+          "active" &&
+        roleParsed.data.role !==
+          "super_admin"
+      ) {
+        const activeSuperAdmins =
+          new Set(
+            entries
+              .filter(
+                (entry) =>
+                  entry.userId &&
+                  entry.role ===
+                    "super_admin" &&
+                  entry.accountStatus ===
+                    "active",
+              )
+              .map(
+                (entry) =>
+                  entry.userId!,
+              ),
+          ).size;
+
+        if (
+          activeSuperAdmins <= 1
+        ) {
+          return NextResponse.json(
+            {
+              message:
+                "Le dernier super administrateur doit conserver ce rôle.",
+            },
+            {
+              status: 400,
+            },
+          );
+        }
+      }
+
       await updateMemberAccountRole(
         roleParsed.data.userId,
         roleParsed.data.role,
@@ -499,8 +549,25 @@ export async function DELETE(
     .object({
       id: z
         .string()
-        .min(1),
+        .min(1)
+        .optional(),
+
+      userId: z
+        .string()
+        .min(1)
+        .optional(),
     })
+    .refine(
+      (value) =>
+        Boolean(
+          value.id ||
+          value.userId,
+        ),
+      {
+        message:
+          "Member or user ID required.",
+      },
+    )
     .safeParse(body);
 
   if (!parsed.success) {
@@ -522,8 +589,16 @@ export async function DELETE(
     const target =
       entries.find(
         (entry) =>
-          entry.membershipId ===
-          parsed.data.id,
+          (
+            parsed.data.id &&
+            entry.membershipId ===
+              parsed.data.id
+          ) ||
+          (
+            parsed.data.userId &&
+            entry.userId ===
+              parsed.data.userId
+          ),
       );
 
     if (!target) {
@@ -545,7 +620,7 @@ export async function DELETE(
       return NextResponse.json(
         {
           message:
-            "Vous ne pouvez pas retirer votre propre compte.",
+            "Vous ne pouvez pas supprimer votre propre compte.",
         },
         {
           status: 400,
@@ -562,7 +637,7 @@ export async function DELETE(
       return NextResponse.json(
         {
           message:
-            "Vous ne pouvez pas retirer ce membre.",
+            "Vous ne pouvez pas supprimer ce membre.",
         },
         {
           status: 403,
@@ -570,9 +645,54 @@ export async function DELETE(
       );
     }
 
-    await deleteMember(
-      parsed.data.id,
-    );
+    if (
+      target.userId &&
+      target.role ===
+        "super_admin" &&
+      target.accountStatus ===
+        "active"
+    ) {
+      const activeSuperAdmins =
+        new Set(
+          entries
+            .filter(
+              (entry) =>
+                entry.userId &&
+                entry.role ===
+                  "super_admin" &&
+                entry.accountStatus ===
+                  "active",
+            )
+            .map(
+              (entry) =>
+                entry.userId!,
+            ),
+        ).size;
+
+      if (
+        activeSuperAdmins <= 1
+      ) {
+        return NextResponse.json(
+          {
+            message:
+              "Le dernier super administrateur ne peut pas être supprimé.",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+    }
+
+    await deleteMember({
+      id:
+        target.membershipId ??
+        undefined,
+
+      userId:
+        target.userId ??
+        undefined,
+    });
 
     return NextResponse.json({
       ok: true,

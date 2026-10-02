@@ -207,9 +207,8 @@ export function DashboardShell({
     );
 
   const pageTitle =
-    pathname ===
-    "/membre/profil"
-      ? "Mon profil"
+    pathname === "/membre/parametres"
+      ? "Mon compte"
       : currentLink?.label ??
         (pathname.startsWith(
           "/admin",
@@ -593,16 +592,14 @@ export function DashboardShell({
 
                   <div className="p-2">
                     <Link
-                      href="/membre/profil"
-                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-950"
+                      href="/membre/parametres"
+                      onClick={() =>
+                        setProfileOpen(false)
+                      }
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-950"
                     >
-                      <UserRound
-                        size={
-                          17
-                        }
-                      />
-
-                      Mon profil
+                      <UserRound size={17} />
+                      Mon compte
                     </Link>
 
                     <button
@@ -698,15 +695,7 @@ export function DashboardShell({
                 </button>
               </div>
 
-              <Link
-                href="/membre/profil"
-                onClick={() =>
-                  setMobileOpen(
-                    false,
-                  )
-                }
-                className="flex items-center gap-3 border-b border-slate-200 px-4 py-4 transition hover:bg-slate-50"
-              >
+              <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-4">
                 <UserAvatar />
 
                 <div className="min-w-0 flex-1">
@@ -723,12 +712,7 @@ export function DashboardShell({
                     {user.email}
                   </p>
                 </div>
-
-                <UserRound
-                  size={17}
-                  className="text-slate-400"
-                />
-              </Link>
+              </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-3 py-5">
                 <Navigation
@@ -737,6 +721,17 @@ export function DashboardShell({
               </div>
 
               <div className="border-t border-slate-200 p-3">
+                <Link
+                  href="/membre/parametres"
+                  onClick={() =>
+                    setMobileOpen(false)
+                  }
+                  className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                >
+                  <UserRound size={17} />
+                  Mon compte
+                </Link>
+
                 <button
                   type="button"
                   onClick={() =>
@@ -745,7 +740,7 @@ export function DashboardShell({
                   disabled={
                     loggingOut
                   }
-                  className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-slate-600 hover:bg-slate-100"
+                  className="mt-1 flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-slate-600 hover:bg-slate-100"
                 >
                   <LogOut
                     size={17}

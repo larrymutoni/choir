@@ -1,6 +1,22 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { loginUser } from "@/server/auth/service";
+
+import {
+  createUserSession,
+} from "@/server/auth/session";
+
+import {
+  loginUser,
+} from "@/server/auth/service";
+
+import {
+  getSecurityState,
+} from "@/server/auth/security-repository";
+
+import {
+  isCurrentDeviceTrusted,
+  issueTwoFactorChallenge,
+} from "@/server/auth/two-factor";
 
 const loginSchema = z.object({
   email: z.string().trim().email().max(254),
@@ -45,8 +61,49 @@ export async function POST(request: Request) {
       );
     }
 
+    const security =
+      await getSecurityState(
+        result.user.id,
+      );
+
+    if (
+      security.twoFactorEnabled
+    ) {
+      const trusted =
+        await isCurrentDeviceTrusted(
+          result.user.id,
+        );
+
+      if (!trusted) {
+        const challenge =
+          await issueTwoFactorChallenge({
+            userId:
+              result.user.id,
+            email:
+              result.user.email,
+            purpose:
+              "login",
+          });
+
+        return NextResponse.json({
+          ok: true,
+          requiresTwoFactor:
+            true,
+          challengeId:
+            challenge.id,
+          expiresInMinutes:
+            challenge.expiresInMinutes,
+        });
+      }
+    }
+
+    await createUserSession(
+      result.user.id,
+    );
+
     return NextResponse.json({
       ok: true,
+      requiresTwoFactor: false,
       user: result.user,
     });
   } catch (error) {

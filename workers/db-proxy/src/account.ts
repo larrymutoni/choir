@@ -45,6 +45,13 @@ export async function updateUserPassword(request: Request, env: Env) {
           AND id <> ?
         `,
     ).bind(body.userId, body.currentSessionId),
+
+    env.DB.prepare(
+      `
+        DELETE FROM trusted_devices
+        WHERE user_id = ?
+        `,
+    ).bind(body.userId),
   ]);
 
   if (results[0].meta.changes === 0) {
