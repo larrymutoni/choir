@@ -5,7 +5,6 @@ export const PUBLIC_NAV_ITEMS = [
   { label: "Accueil", href: "/" },
   { label: "La chorale", href: "/a-propos" },
   { label: "Activités", href: "/activites" },
-  { label: "Galerie", href: "/galerie" },
   { label: "Contact", href: "/contact" },
 ] as const;
 

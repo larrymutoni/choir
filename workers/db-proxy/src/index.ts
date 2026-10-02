@@ -33,6 +33,18 @@ import {
 import { createSession, deleteSession, findSession } from "./sessions";
 
 import {
+  consumeTwoFactorChallenge,
+  createTrustedDevice,
+  createTwoFactorChallenge,
+  failTwoFactorChallenge,
+  findTrustedDevice,
+  getSecurityState,
+  getTwoFactorChallenge,
+  revokeTrustedDevice,
+  updateTwoFactorState,
+} from "./security";
+
+import {
   consumePasswordResetToken,
   createPasswordResetToken,
   findPasswordResetToken,
@@ -86,6 +98,15 @@ import {
   updateSiteContent,
 } from "./content";
 
+import {
+  createGalleryAlbum,
+  deleteGalleryAlbum,
+  deleteGalleryMedia,
+  handlePublicGalleryRequest,
+  listGallery,
+  updateGalleryAlbum,
+} from "./gallery";
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
@@ -101,6 +122,16 @@ export default {
 
       if (publicResourceResponse) {
         return publicResourceResponse;
+      }
+
+      const publicGalleryResponse =
+        await handlePublicGalleryRequest(
+          request,
+          env,
+        );
+
+      if (publicGalleryResponse) {
+        return publicGalleryResponse;
       }
 
       /*
@@ -506,6 +537,70 @@ export default {
       }
 
       /*
+       * ACCOUNT SECURITY / 2FA
+       */
+
+      if (request.method === "GET" && url.pathname === "/v1/security") {
+        return getSecurityState(request, env);
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname === "/v1/security/challenges"
+      ) {
+        return createTwoFactorChallenge(request, env);
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname === "/v1/security/challenges/get"
+      ) {
+        return getTwoFactorChallenge(request, env);
+      }
+
+      if (
+        request.method === "PATCH" &&
+        url.pathname === "/v1/security/challenges/fail"
+      ) {
+        return failTwoFactorChallenge(request, env);
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname === "/v1/security/challenges/consume"
+      ) {
+        return consumeTwoFactorChallenge(request, env);
+      }
+
+      if (
+        request.method === "PATCH" &&
+        url.pathname === "/v1/security/two-factor"
+      ) {
+        return updateTwoFactorState(request, env);
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname === "/v1/security/trusted-devices"
+      ) {
+        return createTrustedDevice(request, env);
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname === "/v1/security/trusted-devices/by-token"
+      ) {
+        return findTrustedDevice(request, env);
+      }
+
+      if (
+        request.method === "DELETE" &&
+        url.pathname === "/v1/security/trusted-devices"
+      ) {
+        return revokeTrustedDevice(request, env);
+      }
+
+      /*
        * PASSWORD RESET
        */
 
@@ -525,6 +620,60 @@ export default {
         url.pathname === "/v1/password-resets/consume"
       ) {
         return consumePasswordResetToken(request, env);
+      }
+
+      /*
+       * PRIVATE GALLERY
+       */
+
+      if (
+        request.method === "GET" &&
+        url.pathname === "/v1/gallery"
+      ) {
+        return listGallery(
+          request,
+          env,
+        );
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname === "/v1/gallery/albums"
+      ) {
+        return createGalleryAlbum(
+          request,
+          env,
+        );
+      }
+
+      if (
+        request.method === "PATCH" &&
+        url.pathname === "/v1/gallery/albums"
+      ) {
+        return updateGalleryAlbum(
+          request,
+          env,
+        );
+      }
+
+      if (
+        request.method === "DELETE" &&
+        url.pathname === "/v1/gallery/albums"
+      ) {
+        return deleteGalleryAlbum(
+          request,
+          env,
+        );
+      }
+
+      if (
+        request.method === "DELETE" &&
+        url.pathname === "/v1/gallery/media"
+      ) {
+        return deleteGalleryMedia(
+          request,
+          env,
+        );
       }
 
       return json(

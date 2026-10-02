@@ -140,8 +140,6 @@ export async function loginUser(emailInput: string, password: string) {
     };
   }
 
-  await createUserSession(user.id);
-
   return {
     ok: true as const,
     user: {
