@@ -1,4 +1,5 @@
 import { Env, json, normalizeEmail, readJson } from "./http";
+import { verifyMemberInvitation } from "./member-invitations";
 
 type UserRow = {
   id: string;
@@ -113,6 +114,7 @@ export async function createUser(request: Request, env: Env) {
     phone?: string | null;
     role?: string;
     status?: string;
+    invitation?: string | null;
   }>(request);
 
   if (
@@ -166,6 +168,22 @@ export async function createUser(request: Request, env: Env) {
   }
 
   const email = normalizeEmail(body.email);
+  // This endpoint is exclusively used by the public registration form.
+  // Never trust a requested status based on the address alone.
+  if (roleName !== "member") {
+    return json({ error: "Registration role forbidden" }, 403);
+  }
+  const membership = await env.DB.prepare(
+    "SELECT id FROM members WHERE LOWER(email) = LOWER(?) LIMIT 1",
+  ).bind(email).first<{ id: string }>();
+  if (membership) {
+    if (status !== "active" ||
+        !await verifyMemberInvitation(body.invitation ?? undefined, email, membership.id, env)) {
+      return json({ error: "Valid member invitation required" }, 403);
+    }
+  } else if (status !== "pending" || body.invitation) {
+    return json({ error: "Invalid member registration" }, 403);
+  }
 
   const now = new Date().toISOString();
 

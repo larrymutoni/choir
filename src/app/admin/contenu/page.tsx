@@ -544,7 +544,7 @@ export default async function AdminContentPage() {
   return (
     <main className="pb-10">
       <AdminHeader
-        title="Pages"
+        title="Pages publiques"
       />
 
       <ContentForm

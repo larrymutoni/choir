@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 
 export default function RegisterPage() {
@@ -10,6 +11,20 @@ export default function RegisterPage() {
   const [firstname, setFirstname] = useState("");
   const [lastname, setLastname] = useState("");
   const [email, setEmail] = useState("");
+  const [invitation, setInvitation] = useState("");
+
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.hash.slice(1)).get("invitation");
+    if (!token) return;
+    setInvitation(token);
+    try {
+      const encoded = token.split(".")[0];
+      const payload = JSON.parse(atob(encoded.replace(/-/g, "+").replace(/_/g, "/"))) as { email?: unknown };
+      if (typeof payload.email === "string" && payload.email.length <= 254) {
+        setEmail(payload.email);
+      }
+    } catch { /* The API securely checks the signature. */ }
+  }, []);
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -33,6 +48,7 @@ export default function RegisterPage() {
           email,
           password,
           phone: phone || null,
+          invitation: invitation || null,
         }),
       });
 
@@ -64,6 +80,7 @@ export default function RegisterPage() {
     <main className="mx-auto flex min-h-screen max-w-md items-center px-6">
       <div className="w-full">
         <h1 className="mb-6 text-3xl font-semibold">Inscription</h1>
+        {invitation && <p className="mb-4 text-sm text-gray-600">Invitation reçue : renseignez vos informations pour créer votre compte.</p>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -108,6 +125,7 @@ export default function RegisterPage() {
               type="email"
               autoComplete="email"
               required
+              readOnly={Boolean(invitation)}
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               className="w-full rounded-md border px-3 py-2"
@@ -143,6 +161,7 @@ export default function RegisterPage() {
               onChange={(event) => setPassword(event.target.value)}
               className="w-full rounded-md border px-3 py-2"
             />
+            <p className="mt-1 text-sm text-gray-600">8 caractères minimum.</p>
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
@@ -154,6 +173,12 @@ export default function RegisterPage() {
           >
             {loading ? "Inscription..." : "S'inscrire"}
           </button>
+          <p className="text-center text-sm text-gray-700">
+            Déjà un compte ?{" "}
+            <Link href="/connexion" className="font-medium underline underline-offset-2 hover:text-black">
+              Se connecter
+            </Link>
+          </p>
         </form>
       </div>
     </main>

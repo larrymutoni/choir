@@ -190,6 +190,7 @@ export function PageImageEditor({
         </p>
 
         {imageUrl ? (
+          <>
           <div className="group relative overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-sm">
             <img
               src={imageUrl}
@@ -236,18 +237,33 @@ export function PageImageEditor({
               )}
             </div>
           </div>
+          {canManage ? (
+            <button
+              type="button"
+              onClick={() => setModal("edit")}
+              className="mt-2 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-blue-500"
+            >
+              <Pencil size={14} /> Modifier cette photo
+            </button>
+          ) : (
+            <p className="mt-2 text-xs text-slate-500">
+              Photo en lecture seule. Permission « Images » nécessaire pour la modifier.
+            </p>
+          )}
+          </>
         ) : canManage ? (
           <button
             type="button"
             onClick={() =>
               setModal("edit")
             }
-            className="flex aspect-[4/3] w-full items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 transition hover:border-slate-400 hover:bg-slate-100"
+            className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 transition hover:border-slate-400 hover:bg-slate-100"
           >
             <ImagePlus
               size={24}
               className="text-slate-400"
             />
+            <span className="text-xs font-semibold text-slate-600">Ajouter une photo</span>
           </button>
         ) : (
           <div className="flex aspect-[4/3] items-center justify-center rounded-xl border border-slate-200 bg-slate-50">

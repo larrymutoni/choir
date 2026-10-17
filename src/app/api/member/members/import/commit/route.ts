@@ -3,7 +3,15 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getCurrentSession } from "@/server/auth/session";
-import { importMembers } from "@/server/members/repository";
+import {
+  importMembers,
+  listMemberEntries,
+} from "@/server/members/repository";
+
+import {
+  sendMemberInvitationEmail,
+} from "@/server/email/member";
+import { makeInvitationUrl } from "@/server/auth/invitation";
 
 const memberSchema = z.object({
   firstname: z.string().trim().min(1).max(80),
@@ -13,6 +21,15 @@ const memberSchema = z.object({
   email: z.string().trim().email().max(254),
 
   phone: z.string().trim().max(30).nullable().optional(),
+
+  voiceType: z
+    .enum([
+      "soprano",
+      "alto",
+      "tenor",
+    ])
+    .nullable()
+    .optional(),
 });
 
 const importSchema = z.object({
@@ -90,7 +107,20 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await importMembers(
+    const existingEntries =
+      await listMemberEntries();
+
+    const existingEmails =
+      new Set(
+        existingEntries.map(
+          (entry) =>
+            entry.email
+              .trim()
+              .toLowerCase(),
+        ),
+      );
+
+    const normalizedMembers =
       parsed.data.members.map((member) => ({
         firstname: member.firstname,
 
@@ -99,12 +129,79 @@ export async function POST(request: Request) {
         email: member.email.trim().toLowerCase(),
 
         phone: member.phone || null,
-      })),
+
+        voiceType:
+          member.voiceType ?? null,
+      }));
+
+    const result = await importMembers(
+      normalizedMembers,
     );
 
-    return NextResponse.json(result, {
-      status: 201,
-    });
+    const invitationTargets =
+      normalizedMembers.filter(
+        (member) =>
+          !existingEmails.has(
+            member.email,
+          ),
+      );
+
+    let invitationsSent = 0;
+    let invitationsFailed = 0;
+
+    const addedMembers = await listMemberEntries();
+    const memberIdByEmail = new Map(
+      addedMembers.filter((member) => member.membershipId)
+        .map((member) => [member.email.trim().toLowerCase(), member.membershipId!]),
+    );
+
+    for (
+      let offset = 0;
+      offset < invitationTargets.length;
+      offset += 10
+    ) {
+      const batch =
+        invitationTargets.slice(
+          offset,
+          offset + 10,
+        );
+
+      const results =
+        await Promise.allSettled(
+          batch.map(async (member) => {
+            const memberId = memberIdByEmail.get(member.email);
+            if (!memberId) throw new Error("Member record was not found after import");
+            await sendMemberInvitationEmail(
+              member.email, makeInvitationUrl(request.url, member.email, memberId),
+            );
+          }),
+        );
+
+      for (const emailResult of results) {
+        if (emailResult.status === "fulfilled") {
+          invitationsSent += 1;
+        } else {
+          invitationsFailed += 1;
+          console.error(
+            "Member import invitation:",
+            emailResult.reason,
+          );
+        }
+      }
+    }
+
+    return NextResponse.json(
+      {
+        ...result,
+        invitationsSent,
+        invitationsFailed,
+      },
+      {
+        status: 201,
+      },
+    );
+
+
   } catch (error) {
     console.error("Members import commit:", error);
 

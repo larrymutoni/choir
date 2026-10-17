@@ -23,9 +23,15 @@ type ExistingCalendarEvent = {
   endAt: string | null;
   location: string | null;
   notes: string | null;
+  seriesId: string | null;
+  originalStartAt: string | null;
+  isRecurring: boolean;
 };
 
-type DuplicateSource = "calendar" | "file" | null;
+type DuplicateSource =
+  | "calendar"
+  | "file"
+  | null;
 
 type ImportedRow = {
   id: string;
@@ -37,6 +43,11 @@ type ImportedRow = {
   notes: string;
   duplicate: boolean;
   duplicateSource: DuplicateSource;
+  timeConflict: boolean;
+  conflictAction:
+    | "keep-existing"
+    | "replace"
+    | "keep-both";
   existingEvent: ExistingCalendarEvent | null;
   warning: string | null;
 };
@@ -51,6 +62,7 @@ type ParsedRow = {
   notes: string;
   duplicate?: boolean;
   duplicateSource?: DuplicateSource;
+  timeConflict?: boolean;
   existingEvent?: ExistingCalendarEvent | null;
   warning: string | null;
 };
@@ -59,6 +71,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onImported: () => void;
+  canClear: boolean;
 };
 
 function emptyRow(): ImportedRow {
@@ -72,6 +85,8 @@ function emptyRow(): ImportedRow {
     notes: "",
     duplicate: false,
     duplicateSource: null,
+    timeConflict: false,
+    conflictAction: "keep-existing",
     existingEvent: null,
     warning: null,
   };
@@ -149,6 +164,7 @@ export function CalendarImportModal({
   open,
   onClose,
   onImported,
+  canClear,
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -159,47 +175,148 @@ export function CalendarImportModal({
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
 
+  const [
+    clearBeforeImport,
+    setClearBeforeImport,
+  ] = useState(false);
+
+
   if (!open) {
     return null;
   }
 
-  const duplicateCount = rows.filter((row) => row.duplicate).length;
+  const duplicateCount =
+    rows.filter(
+      (row) =>
+        row.duplicate,
+    ).length;
 
-  const calendarDuplicateCount = rows.filter(
-    (row) => row.duplicateSource === "calendar",
-  ).length;
+  const calendarDuplicateCount =
+    clearBeforeImport
+      ? 0
+      : rows.filter(
+          (row) =>
+            row.duplicateSource ===
+            "calendar",
+        ).length;
 
-  const fileDuplicateCount = rows.filter(
-    (row) => row.duplicateSource === "file",
-  ).length;
+  const fileDuplicateCount =
+    rows.filter(
+      (row) =>
+        row.duplicateSource ===
+        "file",
+    ).length;
 
-  const invalidCount = rows.filter(
-    (row) =>
-      !row.duplicate &&
-      Boolean(rowError(row)),
-  ).length;
+  const importableRows =
+    rows.filter((row) => {
+      /*
+       * Un doublon présent plusieurs fois
+       * dans le fichier reste ignoré.
+       */
+      if (
+        row.duplicateSource ===
+        "file"
+      ) {
+        return false;
+      }
 
-  const warningCount = rows.filter(
-    (row) =>
-      !row.duplicate &&
-      !rowError(row) &&
-      Boolean(row.warning),
-  ).length;
+      /*
+       * Si on nettoie tout le calendrier,
+       * tout ce qui vient du fichier peut
+       * être réimporté.
+       */
+      if (clearBeforeImport) {
+        return true;
+      }
 
-  const validCount = rows.filter(
-    (row) =>
-      !row.duplicate &&
-      !rowError(row),
-  ).length;
+      /*
+       * Doublon exact déjà présent :
+       * on conserve l'existant.
+       */
+      if (row.duplicate) {
+        return false;
+      }
 
-  const newRows = rows.filter((row) => !row.duplicate);
-  const duplicateRows = rows.filter((row) => row.duplicate);
+      /*
+       * Même créneau mais événement
+       * différent :
+       * "Conserver l'ancien" signifie
+       * ne pas importer le nouveau.
+       */
+      if (
+        row.timeConflict &&
+        row.conflictAction ===
+          "keep-existing"
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+  const invalidCount =
+    importableRows.filter(
+      (row) =>
+        Boolean(
+          rowError(row),
+        ),
+    ).length;
+
+  const warningCount =
+    importableRows.filter(
+      (row) =>
+        !rowError(row) &&
+        Boolean(
+          row.warning,
+        ),
+    ).length;
+
+  const validCount =
+    importableRows.filter(
+      (row) =>
+        !rowError(row),
+    ).length;
+
+  const newRows =
+    rows.filter(
+      (row) =>
+        row.duplicateSource !==
+          "file" &&
+        (
+          clearBeforeImport ||
+          (
+            !row.duplicate &&
+            !row.timeConflict
+          )
+        ),
+    );
+
+  const conflictRows =
+    clearBeforeImport
+      ? []
+      : rows.filter(
+          (row) =>
+            !row.duplicate &&
+            row.timeConflict,
+        );
+
+  const duplicateRows =
+    rows.filter(
+      (row) =>
+        row.duplicateSource ===
+          "file" ||
+        (
+          !clearBeforeImport &&
+          row.duplicate
+        ),
+    );
 
   function reset() {
     setFileName("");
     setRows([]);
     setExpanded(new Set());
     setError("");
+    setClearBeforeImport(false);
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -286,6 +403,8 @@ export function CalendarImportModal({
           notes: event.notes,
           duplicate: Boolean(event.duplicate),
           duplicateSource: event.duplicateSource ?? null,
+          timeConflict: Boolean(event.timeConflict),
+          conflictAction: "keep-existing",
           existingEvent: event.existingEvent ?? null,
           warning: event.warning,
         })),
@@ -313,13 +432,22 @@ export function CalendarImportModal({
       return;
     }
 
+    if (
+      clearBeforeImport &&
+      !window.confirm(
+        "Tout le calendrier actuel sera supprimé avant l'import. Cette action est irréversible. Continuer ?",
+      )
+    ) {
+      return;
+    }
+
     setImporting(true);
     setError("");
 
     try {
-      const events = rows
-        .filter((row) => !row.duplicate)
-        .map((row) => ({
+      const events =
+        importableRows.map(
+          (row) => ({
           title: row.title.trim(),
           startAt: toIso(row.date, row.startTime),
           endAt: row.endTime
@@ -328,6 +456,23 @@ export function CalendarImportModal({
           allDay: false,
           location: row.location.trim() || null,
           notes: row.notes.trim() || null,
+
+          replaceExisting:
+            !clearBeforeImport &&
+            row.timeConflict &&
+            row.conflictAction === "replace" &&
+            row.existingEvent
+              ? {
+                  id:
+                    row.existingEvent.id,
+                  seriesId:
+                    row.existingEvent.seriesId,
+                  originalStartAt:
+                    row.existingEvent.originalStartAt,
+                  isRecurring:
+                    row.existingEvent.isRecurring,
+                }
+              : null,
         }));
 
       const response = await fetch(
@@ -337,7 +482,10 @@ export function CalendarImportModal({
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ events }),
+          body: JSON.stringify({
+            events,
+            clearBeforeImport,
+          }),
         },
       );
 
@@ -495,7 +643,7 @@ export function CalendarImportModal({
 
                   {calendarDuplicateCount > 0 && (
                     <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                      {calendarDuplicateCount} déjà au calendrier
+                      {calendarDuplicateCount} doublon{calendarDuplicateCount > 1 ? "s" : ""} exact{calendarDuplicateCount > 1 ? "s" : ""}
                     </span>
                   )}
 
@@ -555,7 +703,34 @@ export function CalendarImportModal({
                   Ajouter une ligne
                 </button>
               </div>
+
             </div>
+
+            {canClear && rows.length > 0 && (
+              <div className="border-t border-slate-100 px-4 py-2.5 sm:px-5">
+                <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={clearBeforeImport}
+                    disabled={importing}
+                    onChange={(event) =>
+                      setClearBeforeImport(
+                        event.target.checked,
+                      )
+                    }
+                    className="h-4 w-4 rounded border-slate-300"
+                  />
+
+                  Tout nettoyer avant l'import
+                </label>
+
+                {clearBeforeImport && (
+                  <p className="mt-1 text-[11px] font-medium text-red-600">
+                    Tous les événements actuellement dans le calendrier seront supprimés.
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5">
               <div className="space-y-5">
@@ -729,135 +904,148 @@ export function CalendarImportModal({
                   </section>
                 )}
 
-                {duplicateRows.length > 0 && (
+                {conflictRows.length > 0 && (
                   <section>
-                    <div className="mb-2 flex items-center justify-between">
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Déjà enregistrés
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+                        Créneaux déjà occupés
                       </h3>
 
                       <span className="text-xs text-slate-400">
-                        Non réimportés
+                        Choisissez quoi faire
                       </span>
                     </div>
 
-                    <div className="space-y-2">
-                      {duplicateRows.map((row) => {
-                        const isOpen = expanded.has(row.id);
+                    <div className="overflow-hidden rounded-xl border border-amber-200 bg-white">
+                      {conflictRows.map((row) => {
                         const existing = row.existingEvent;
 
                         return (
                           <div
                             key={row.id}
-                            className="overflow-hidden rounded-xl border border-slate-200 bg-white"
+                            className="border-b border-slate-100 px-3 py-3 last:border-b-0"
                           >
-                            <div className="flex items-center gap-3 px-3 py-2.5">
-                              <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <p className="truncate text-sm font-semibold text-slate-800">
-                                    {row.title}
-                                  </p>
-
-                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                                    {row.duplicateSource === "file"
-                                      ? "Doublon dans le fichier"
-                                      : "Déjà dans le calendrier"}
-                                  </span>
-                                </div>
-
-                                <p className="mt-1 text-xs text-slate-500">
-                                  {row.date}
-                                  {row.startTime
-                                    ? ` · ${row.startTime}${
-                                        row.endTime
-                                          ? ` – ${row.endTime}`
-                                          : ""
-                                      }`
-                                    : ""}
-                                  {row.location
-                                    ? ` · ${row.location}`
-                                    : ""}
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-slate-900">
+                                  {row.title}
                                 </p>
+
+                                <p className="mt-0.5 text-xs text-slate-500">
+                                  {row.date} · {row.startTime}
+                                  {row.endTime ? ` – ${row.endTime}` : ""}
+                                </p>
+
+                                {existing && (
+                                  <p className="mt-1.5 text-xs text-amber-800">
+                                    Déjà à cette heure :{" "}
+                                    <strong>{existing.title}</strong>
+                                  </p>
+                                )}
                               </div>
 
-                              {existing && (
+                              <div className="flex shrink-0 rounded-lg border border-slate-200 bg-slate-50 p-1">
                                 <button
                                   type="button"
-                                  onClick={() => toggleDetails(row.id)}
-                                  className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100"
+                                  disabled={importing || clearBeforeImport}
+                                  onClick={() =>
+                                    updateRow(row.id, {
+                                      conflictAction: "keep-existing",
+                                    })
+                                  }
+                                  className={`rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${
+                                    row.conflictAction === "keep-existing"
+                                      ? "bg-white text-slate-900 shadow-sm"
+                                      : "text-slate-500 hover:text-slate-900"
+                                  }`}
                                 >
-                                  {isOpen ? (
-                                    <>
-                                      Masquer
-                                      <ChevronUp size={13} />
-                                    </>
-                                  ) : (
-                                    <>
-                                      Voir l'existant
-                                      <ChevronDown size={13} />
-                                    </>
-                                  )}
+                                  Conserver l'ancien
                                 </button>
-                              )}
+
+                                <button
+                                  type="button"
+                                  disabled={importing || clearBeforeImport}
+                                  onClick={() =>
+                                    updateRow(row.id, {
+                                      conflictAction: "replace",
+                                    })
+                                  }
+                                  className={`rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${
+                                    row.conflictAction === "replace"
+                                      ? "bg-amber-600 text-white shadow-sm"
+                                      : "text-slate-500 hover:text-slate-900"
+                                  }`}
+                                >
+                                  Remplacer l'ancien
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={importing || clearBeforeImport}
+                                  onClick={() =>
+                                    updateRow(row.id, {
+                                      conflictAction: "keep-both",
+                                    })
+                                  }
+                                  className={`rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${
+                                    row.conflictAction === "keep-both"
+                                      ? "bg-slate-900 text-white shadow-sm"
+                                      : "text-slate-500 hover:text-slate-900"
+                                  }`}
+                                >
+                                  Garder les deux
+                                </button>
+                              </div>
                             </div>
-
-                            {row.duplicateSource === "file" && (
-                              <div className="border-t border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-                                Le même titre, la même date et la même heure
-                                apparaissent déjà plus haut dans ce fichier.
-                              </div>
-                            )}
-
-                            {existing && isOpen && (
-                              <div className="border-t border-slate-100 bg-slate-50 px-3 py-3">
-                                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                                  Événement actuellement enregistré
-                                </p>
-
-                                <div className="grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
-                                  <div>
-                                    <span className="font-semibold text-slate-700">
-                                      Date et heure
-                                    </span>
-                                    <p className="mt-0.5">
-                                      {formatExistingDate(existing.startAt)}
-                                      {" · "}
-                                      {existingTimeRange(existing)}
-                                    </p>
-                                  </div>
-
-                                  <div>
-                                    <span className="font-semibold text-slate-700">
-                                      Lieu
-                                    </span>
-                                    <p className="mt-0.5 flex items-center gap-1">
-                                      {existing.location ? (
-                                        <>
-                                          <MapPin size={12} />
-                                          {existing.location}
-                                        </>
-                                      ) : (
-                                        "Non renseigné"
-                                      )}
-                                    </p>
-                                  </div>
-
-                                  {existing.notes && (
-                                    <div className="sm:col-span-2">
-                                      <span className="font-semibold text-slate-700">
-                                        Notes
-                                      </span>
-                                      <p className="mt-0.5 leading-5">
-                                        {existing.notes}
-                                      </p>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
                           </div>
                         );
                       })}
+                    </div>
+
+                    <p className="mt-2 text-[11px] leading-4 text-slate-400">
+                      {clearBeforeImport
+                        ? "Le calendrier actuel sera entièrement remplacé par le fichier."
+                        : "Par défaut, l'événement existant est conservé."}
+                    </p>
+                  </section>
+                )}
+
+                {duplicateRows.length > 0 && (
+                  <section>
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Doublons exacts
+                      </h3>
+
+                      <span className="text-xs text-slate-400">
+                        Ignorés automatiquement
+                      </span>
+                    </div>
+
+                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                      {duplicateRows.map((row) => (
+                        <div
+                          key={row.id}
+                          className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-2.5 last:border-b-0"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-slate-700">
+                              {row.title}
+                            </p>
+
+                            <p className="mt-0.5 text-xs text-slate-400">
+                              {row.date}
+                              {row.startTime
+                                ? ` · ${row.startTime}`
+                                : ""}
+                            </p>
+                          </div>
+
+                          <span className="shrink-0 text-[11px] font-semibold text-slate-400">
+                            Ignoré
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </section>
                 )}
@@ -881,11 +1069,13 @@ export function CalendarImportModal({
                       <strong className="text-slate-800">
                         {validCount}
                       </strong>{" "}
-                      nouvel événement
+                      événement
                       {validCount > 1 ? "s" : ""} sera
-                      {validCount > 1 ? "ont" : ""} ajouté
+                      {validCount > 1 ? "ont" : ""} importé
                       {validCount > 1 ? "s" : ""}.
                     </>
+                  ) : conflictRows.length > 0 ? (
+                    "Les événements existants seront conservés."
                   ) : duplicateCount > 0 ? (
                     "Le fichier ne contient rien de nouveau à importer."
                   ) : (
@@ -920,7 +1110,7 @@ export function CalendarImportModal({
 
                         {importing
                           ? "Ajout…"
-                          : `Ajouter ${validCount} événement${
+                          : `Importer ${validCount} événement${
                               validCount > 1 ? "s" : ""
                             }`}
                       </button>

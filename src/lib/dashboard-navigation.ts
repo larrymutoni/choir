@@ -61,7 +61,7 @@ export const dashboardNavigationItems:
       permission: "members",
     },
     {
-      label: "Pages",
+      label: "Pages publiques",
       href: "/admin/contenu",
       iconKey: "content",
       group: "management",

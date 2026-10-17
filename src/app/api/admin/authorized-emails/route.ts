@@ -2,6 +2,10 @@ import { hasRolePermission } from "@/lib/permissions";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentSession } from "@/server/auth/session";
+import { findUserByEmail } from "@/server/auth/repository";
+import { listMemberEntries } from "@/server/members/repository";
+import { makeInvitationUrl } from "@/server/auth/invitation";
+import { sendMemberInvitationEmail } from "@/server/email/member";
 import {
   addAuthorizedEmail,
   deleteAuthorizedEmail,
@@ -73,9 +77,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Invalid email." }, { status: 400 });
     }
 
-    await addAuthorizedEmail(parsed.data.email.trim().toLowerCase());
-
-    return NextResponse.json({ ok: true }, { status: 201 });
+    const email = parsed.data.email.trim().toLowerCase();
+    await addAuthorizedEmail(email);
+    let invitationSent = false;
+    const existing = await findUserByEmail(email);
+    if (!existing) {
+      try {
+        const member = (await listMemberEntries()).find(
+          (entry) => entry.membershipId && entry.email.trim().toLowerCase() === email,
+        );
+        if (member?.membershipId) {
+          await sendMemberInvitationEmail(
+            email, makeInvitationUrl(request.url, email, member.membershipId),
+          );
+          invitationSent = true;
+        }
+      } catch (error) {
+        console.error("Authorized email invitation failed:", error);
+      }
+    }
+    return NextResponse.json({ ok: true, invitationSent }, { status: 201 });
   } catch (error) {
     console.error("Unable to add authorized email:", error);
 

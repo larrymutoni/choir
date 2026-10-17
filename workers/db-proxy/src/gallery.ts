@@ -293,7 +293,7 @@ function withCors(
 
   headers.set(
     "Access-Control-Allow-Methods",
-    "GET, POST, PATCH, OPTIONS",
+    "GET, POST, PUT, PATCH, OPTIONS",
   );
 
   headers.set(
@@ -489,6 +489,12 @@ export async function handlePublicGalleryRequest(
       );
     }
 
+    if (request.method === "PUT") {
+      return withCors(
+        await moveGalleryMediaToAlbum(request, env, mediaId),
+      );
+    }
+
     return withCors(json({ error: "Method not allowed" }, 405));
   }
 
@@ -526,6 +532,7 @@ export async function listGallery(
           gallery_albums.description,
           gallery_albums.activity,
           gallery_albums.album_date,
+          gallery_albums.sort_order,
           gallery_albums.cover_media_id,
           gallery_albums.created_at,
           gallery_albums.updated_at,
@@ -558,6 +565,8 @@ export async function listGallery(
         GROUP BY gallery_albums.id
 
         ORDER BY
+          CASE WHEN gallery_albums.sort_order IS NULL THEN 1 ELSE 0 END ASC,
+          gallery_albums.sort_order ASC,
           gallery_albums.album_date DESC,
           gallery_albums.created_at DESC
         `,
@@ -619,6 +628,30 @@ export async function listGallery(
     media:
       media.results,
   });
+}
+
+export async function reorderGalleryAlbums(request: Request, env: Env) {
+  const body = await readJson<{ orderedIds?: unknown }>(request);
+  const ids = body.orderedIds;
+  if (!Array.isArray(ids) || ids.length > 500 ||
+      !ids.every((id): id is string => typeof id === "string" && /^[a-f0-9-]{36}$/i.test(id)) ||
+      new Set(ids).size !== ids.length) {
+    return json({ error: "Invalid album order" }, 400);
+  }
+  const result = await env.DB.prepare("SELECT id FROM gallery_albums").all<{ id: string }>();
+  const knownIds = new Set(result.results.map((album) => album.id));
+  if (ids.length !== knownIds.size || !ids.every((id) => knownIds.has(id))) {
+    return json({ error: "Album list changed. Refresh before reordering." }, 409);
+  }
+  const now = new Date().toISOString();
+  if (ids.length) {
+    const statements = ids.map((id, index) =>
+      env.DB.prepare("UPDATE gallery_albums SET sort_order = ?, updated_at = ? WHERE id = ?")
+        .bind(index, now, id),
+    );
+    await env.DB.batch(statements);
+  }
+  return json({ ok: true });
 }
 
 export async function createGalleryAlbum(
@@ -1129,6 +1162,36 @@ export async function storeGalleryVariants(
     new Date().toISOString(),
     mediaId,
   ).run();
+
+  return json({ ok: true });
+}
+
+// Le déplacement modifie uniquement l'album, sans effacer la date ou l'année.
+export async function moveGalleryMediaToAlbum(
+  request: Request,
+  env: Env,
+  mediaId: string,
+) {
+  const body = await readJson<{ albumId?: unknown }>(request);
+  if (typeof body.albumId !== "string" || !body.albumId.trim()) {
+    return json({ error: "Album requis" }, 400);
+  }
+
+  const media = await env.DB.prepare(
+    `SELECT id, album_id FROM gallery_media WHERE id = ? LIMIT 1`,
+  ).bind(mediaId).first<{ id: string; album_id: string | null }>();
+  if (!media) return json({ error: "Media not found" }, 404);
+
+  const album = await env.DB.prepare(
+    `SELECT id FROM gallery_albums WHERE id = ? LIMIT 1`,
+  ).bind(body.albumId).first();
+  if (!album) return json({ error: "Album not found" }, 404);
+
+  if (media.album_id === body.albumId) return json({ ok: true, unchanged: true });
+
+  await env.DB.prepare(
+    `UPDATE gallery_media SET album_id = ?, updated_at = ? WHERE id = ?`,
+  ).bind(body.albumId, new Date().toISOString(), mediaId).run();
 
   return json({ ok: true });
 }

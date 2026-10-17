@@ -10,82 +10,151 @@ export const runtime = "nodejs";
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 function canManage(
-  session: Parameters<typeof hasRolePermission>[0],
+  session: Parameters<
+    typeof hasRolePermission
+  >[0],
 ) {
-  return hasRolePermission(session, "calendar");
+  return hasRolePermission(
+    session,
+    "calendar",
+  );
 }
 
-function normalizeTitle(value: string) {
-  return value.trim().toLocaleLowerCase("fr");
+function normalizeTitle(
+  value: string,
+) {
+  return value
+    .normalize("NFKC")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("fr");
 }
 
-function localDateTime(startAt: string) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Paris",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date(startAt));
+function localDateTime(
+  startAt: string,
+) {
+  const parts =
+    new Intl.DateTimeFormat(
+      "en-CA",
+      {
+        timeZone:
+          "Europe/Paris",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      },
+    ).formatToParts(
+      new Date(startAt),
+    );
 
-  const get = (type: string) =>
-    parts.find((part) => part.type === type)?.value ?? "";
+  const get = (
+    type: string,
+  ) =>
+    parts.find(
+      (part) =>
+        part.type === type,
+    )?.value ?? "";
 
   return {
-    date: `${get("year")}-${get("month")}-${get("day")}`,
-    time: `${get("hour")}:${get("minute")}`,
+    date:
+      `${get("year")}-${get("month")}-${get("day")}`,
+    time:
+      `${get("hour")}:${get("minute")}`,
   };
 }
 
-export async function POST(request: Request) {
-  const session = await getCurrentSession();
+export async function POST(
+  request: Request,
+) {
+  const session =
+    await getCurrentSession();
 
   if (!session) {
     return NextResponse.json(
-      { message: "Authentication required." },
+      {
+        message:
+          "Authentication required.",
+      },
       { status: 401 },
     );
   }
 
   if (!canManage(session)) {
     return NextResponse.json(
-      { message: "Forbidden." },
+      {
+        message: "Forbidden.",
+      },
       { status: 403 },
     );
   }
 
   try {
-    const formData = await request.formData();
-    const file = formData.get("file");
+    const formData =
+      await request.formData();
 
-    if (!(file instanceof File)) {
+    const file =
+      formData.get("file");
+
+    if (
+      !(file instanceof File)
+    ) {
       return NextResponse.json(
-        { message: "Sélectionnez un fichier." },
+        {
+          message:
+            "Sélectionnez un fichier.",
+        },
         { status: 400 },
       );
     }
 
-    if (file.size === 0 || file.size > MAX_FILE_SIZE) {
+    if (
+      file.size === 0 ||
+      file.size >
+        MAX_FILE_SIZE
+    ) {
       return NextResponse.json(
-        { message: "Le fichier doit faire moins de 10 Mo." },
+        {
+          message:
+            "Le fichier doit faire moins de 10 Mo.",
+        },
         { status: 400 },
       );
     }
 
-    const extension = file.name.split(".").pop()?.toLowerCase();
+    const extension =
+      file.name
+        .split(".")
+        .pop()
+        ?.toLowerCase();
 
-    if (!extension || !["xlsx", "csv", "docx"].includes(extension)) {
+    if (
+      !extension ||
+      ![
+        "xlsx",
+        "csv",
+        "docx",
+      ].includes(extension)
+    ) {
       return NextResponse.json(
-        { message: "Formats acceptés : XLSX, CSV et DOCX." },
+        {
+          message:
+            "Formats acceptés : XLSX, CSV et DOCX.",
+        },
         { status: 400 },
       );
     }
 
-    const events = await parsePlanningFile(file);
+    const events =
+      await parsePlanningFile(
+        file,
+      );
 
-    if (events.length === 0) {
+    if (
+      events.length === 0
+    ) {
       return NextResponse.json(
         {
           message:
@@ -95,92 +164,213 @@ export async function POST(request: Request) {
       );
     }
 
-    const dates = events
-      .map((event) => event.date)
-      .filter(Boolean)
-      .sort();
+    const dates =
+      events
+        .map(
+          (event) =>
+            event.date,
+        )
+        .filter(Boolean)
+        .sort();
 
-    const existingByKey = new Map<
-      string,
-      Awaited<ReturnType<typeof listCalendarOccurrences>>[number]
-    >();
+    const existingExact =
+      new Map<
+        string,
+        Awaited<
+          ReturnType<
+            typeof listCalendarOccurrences
+          >
+        >[number]
+      >();
 
-    if (dates.length > 0) {
-      const start = new Date(`${dates[0]}T00:00:00.000Z`);
-      start.setUTCDate(start.getUTCDate() - 1);
+    const existingBySlot =
+      new Map<
+        string,
+        Awaited<
+          ReturnType<
+            typeof listCalendarOccurrences
+          >
+        >[number]
+      >();
 
-      const end = new Date(
-        `${dates[dates.length - 1]}T00:00:00.000Z`,
+    if (
+      dates.length > 0
+    ) {
+      const start =
+        new Date(
+          `${dates[0]}T00:00:00.000Z`,
+        );
+
+      start.setUTCDate(
+        start.getUTCDate() - 1,
       );
-      end.setUTCDate(end.getUTCDate() + 2);
 
-      const existing = await listCalendarOccurrences(
-        start.toISOString(),
-        end.toISOString(),
+      const end =
+        new Date(
+          `${dates[dates.length - 1]}T00:00:00.000Z`,
+        );
+
+      end.setUTCDate(
+        end.getUTCDate() + 2,
       );
 
-      for (const event of existing) {
-        const local = localDateTime(event.startAt);
+      const existing =
+        await listCalendarOccurrences(
+          start.toISOString(),
+          end.toISOString(),
+        );
 
-        const key = [
-          normalizeTitle(event.title),
-          local.date,
-          local.time,
-        ].join("|");
+      for (
+        const event of existing
+      ) {
+        const local =
+          localDateTime(
+            event.startAt,
+          );
 
-        if (!existingByKey.has(key)) {
-          existingByKey.set(key, event);
+        const slotKey =
+          [
+            local.date,
+            local.time,
+          ].join("|");
+
+        const exactKey =
+          [
+            normalizeTitle(
+              event.title,
+            ),
+            local.date,
+            local.time,
+          ].join("|");
+
+        existingExact.set(
+          exactKey,
+          event,
+        );
+
+        if (
+          !existingBySlot.has(
+            slotKey,
+          )
+        ) {
+          existingBySlot.set(
+            slotKey,
+            event,
+          );
         }
       }
     }
 
-    const seenInFile = new Set<string>();
+    const seenExact =
+      new Set<string>();
 
-    const checkedEvents = events.map((event) => {
-      if (!event.startTime) {
-        return {
-          ...event,
-          duplicate: false,
-          duplicateSource: null,
-          existingEvent: null,
-        };
-      }
+    const checkedEvents =
+      events.map(
+        (event) => {
+          if (
+            !event.startTime
+          ) {
+            return {
+              ...event,
+              duplicate: false,
+              duplicateSource:
+                null,
+              timeConflict:
+                false,
+              existingEvent:
+                null,
+            };
+          }
 
-      const key = [
-        normalizeTitle(event.title),
-        event.date,
-        event.startTime,
-      ].join("|");
+          const slotKey =
+            [
+              event.date,
+              event.startTime,
+            ].join("|");
 
-      const existingEvent = existingByKey.get(key);
-      const duplicateInFile = seenInFile.has(key);
+          const exactKey =
+            [
+              normalizeTitle(
+                event.title,
+              ),
+              event.date,
+              event.startTime,
+            ].join("|");
 
-      seenInFile.add(key);
+          const duplicateInFile =
+            seenExact.has(
+              exactKey,
+            );
 
-      return {
-        ...event,
-        duplicate: Boolean(existingEvent) || duplicateInFile,
-        duplicateSource: existingEvent
-          ? "calendar"
-          : duplicateInFile
-            ? "file"
-            : null,
-        existingEvent: existingEvent
-          ? {
-              id: existingEvent.id,
-              title: existingEvent.title,
-              startAt: existingEvent.startAt,
-              endAt: existingEvent.endAt,
-              location: existingEvent.location,
-              notes: existingEvent.notes,
-            }
-          : null,
-      };
-    });
+          seenExact.add(
+            exactKey,
+          );
+
+          const exact =
+            existingExact.get(
+              exactKey,
+            );
+
+          const sameSlot =
+            existingBySlot.get(
+              slotKey,
+            );
+
+          const existing =
+            exact ??
+            sameSlot ??
+            null;
+
+          return {
+            ...event,
+
+            duplicate:
+              Boolean(exact) ||
+              duplicateInFile,
+
+            duplicateSource:
+              exact
+                ? "calendar"
+                : duplicateInFile
+                  ? "file"
+                  : null,
+
+            timeConflict:
+              !exact &&
+              !duplicateInFile &&
+              Boolean(sameSlot),
+
+            existingEvent:
+              existing
+                ? {
+                    id:
+                      existing.id,
+                    title:
+                      existing.title,
+                    startAt:
+                      existing.startAt,
+                    endAt:
+                      existing.endAt,
+                    location:
+                      existing.location,
+                    notes:
+                      existing.notes,
+                    seriesId:
+                      existing.seriesId,
+                    originalStartAt:
+                      existing.originalStartAt,
+                    isRecurring:
+                      existing.isRecurring,
+                  }
+                : null,
+          };
+        },
+      );
 
     return NextResponse.json({
       fileName: file.name,
-      events: checkedEvents,
+      events:
+        checkedEvents,
     });
   } catch (error) {
     console.error(error);

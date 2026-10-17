@@ -51,6 +51,7 @@ import {
 } from "./password-resets";
 
 import {
+  clearCalendarEvents,
   createCalendarEvent,
   deleteCalendarEvent,
   getCalendarEvent,
@@ -103,6 +104,7 @@ import {
   deleteGalleryMedia,
   handlePublicGalleryRequest,
   listGallery,
+  reorderGalleryAlbums,
   updateGalleryAlbum,
 } from "./gallery";
 
@@ -339,6 +341,16 @@ export default {
         url.pathname === "/v1/calendar-events"
       ) {
         return updateCalendarEvent(request, env);
+      }
+
+      if (
+        request.method === "DELETE" &&
+        url.pathname === "/v1/calendar-events/all"
+      ) {
+        return clearCalendarEvents(
+          request,
+          env,
+        );
       }
 
       if (
@@ -632,6 +644,13 @@ export default {
           request,
           env,
         );
+      }
+
+      if (
+        request.method === "PUT" &&
+        url.pathname === "/v1/gallery/albums"
+      ) {
+        return reorderGalleryAlbums(request, env);
       }
 
       if (

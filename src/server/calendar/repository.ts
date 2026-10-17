@@ -12,6 +12,7 @@ export type CalendarStoredEvent = {
   allDay: boolean;
   location: string | null;
   notes: string | null;
+  colorOverride: string | null;
   seriesId: string | null;
   createdByUserId: string;
   createdAt: string;
@@ -29,6 +30,7 @@ type CalendarStoredEventRow = {
   all_day: number;
   location: string | null;
   notes: string | null;
+  color_override: string | null;
   series_id: string | null;
   created_by_user_id: string;
   created_at: string;
@@ -61,6 +63,7 @@ export type CalendarEventInput = {
   allDay?: boolean;
   location?: string | null;
   notes?: string | null;
+  colorOverride?: string | null;
   eventKind?: EventKind;
   recurrenceType?: RecurrenceType | null;
   recurrenceUntil?: string | null;
@@ -85,6 +88,7 @@ function mapEvent(row: CalendarStoredEventRow): CalendarStoredEvent {
     allDay: Boolean(row.all_day),
     location: row.location,
     notes: row.notes,
+    colorOverride: row.color_override ?? null,
     seriesId: row.series_id,
     createdByUserId: row.created_by_user_id,
     createdAt: row.created_at,
@@ -153,17 +157,28 @@ export async function createCalendarEvent(
 
 export async function createImportedCalendarEvents(
   events: ImportedCalendarEventInput[],
+  clearBeforeImport = false,
 ) {
   return dbRequest<{
     ok: true;
     count: number;
+    skipped: number;
     ids: string[];
   }>("/v1/calendar-events/import", {
     method: "POST",
 
     body: JSON.stringify({
       events,
+      clearBeforeImport,
     }),
+  });
+}
+
+export async function clearCalendar() {
+  return dbRequest<{
+    ok: true;
+  }>("/v1/calendar-events/all", {
+    method: "DELETE",
   });
 }
 

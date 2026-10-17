@@ -387,6 +387,11 @@ export function SecuritySettings({
 
   return (
     <div className="space-y-5">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
+        <h2 className="font-semibold text-slate-900">Durées de connexion</h2>
+        <p className="mt-2">La connexion expire au bout de 30 jours au maximum, sauf déconnexion anticipée.</p>
+        <p className="mt-1">Un appareil reconnu reste autorisé pendant 30 jours sans redemander le code de double authentification. Les codes de validation expirent après 15 minutes.</p>
+      </section>
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center gap-4 px-5 py-5">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">

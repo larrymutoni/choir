@@ -11,6 +11,7 @@ type CalendarEventInput = {
   allDay?: boolean;
   location?: string | null;
   notes?: string | null;
+  colorOverride?: string | null;
   eventKind?: EventKind;
   recurrenceType?: RecurrenceType | null;
   recurrenceUntil?: string | null;
@@ -33,6 +34,7 @@ const EVENT_COLUMNS = `
   all_day,
   location,
   notes,
+  color_override,
   series_id,
   created_by_user_id,
   created_at,
@@ -42,8 +44,12 @@ const EVENT_COLUMNS = `
   recurrence_until
 `;
 
+function validColor(color: string | null | undefined): boolean {
+  return color === undefined || color === null || /^#[0-9a-fA-F]{6}$/.test(color);
+}
+
 function validEvent(body: CalendarEventInput) {
-  if (!body.title?.trim() || !body.startAt || !body.createdByUserId) {
+  if (!body.title?.trim() || !body.startAt || !body.createdByUserId || !validColor(body.colorOverride)) {
     return false;
   }
 
@@ -168,6 +174,7 @@ export async function createCalendarEvent(request: Request, env: Env) {
         all_day,
         location,
         notes,
+        color_override,
         series_id,
         created_by_user_id,
         created_at,
@@ -176,7 +183,7 @@ export async function createCalendarEvent(request: Request, env: Env) {
         recurrence_type,
         recurrence_until
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
   )
     .bind(
@@ -187,6 +194,7 @@ export async function createCalendarEvent(request: Request, env: Env) {
       body.allDay ? 1 : 0,
       body.location?.trim() || null,
       body.notes?.trim() || null,
+      body.colorOverride ?? null,
       seriesId,
       body.createdByUserId,
       now,
@@ -209,7 +217,7 @@ export async function createCalendarEvent(request: Request, env: Env) {
 export async function updateCalendarEvent(request: Request, env: Env) {
   const body = await readJson<CalendarEventInput>(request);
 
-  if (!body.id || !body.title?.trim() || !body.startAt) {
+  if (!body.id || !body.title?.trim() || !body.startAt || !validColor(body.colorOverride)) {
     return json({ error: "Invalid event" }, 400);
   }
 
@@ -223,6 +231,7 @@ export async function updateCalendarEvent(request: Request, env: Env) {
         all_day = ?,
         location = ?,
         notes = ?,
+        color_override = CASE WHEN ? = 1 THEN ? ELSE color_override END,
         recurrence_type = ?,
         recurrence_until = ?,
         updated_at = ?
@@ -235,6 +244,8 @@ export async function updateCalendarEvent(request: Request, env: Env) {
     body.allDay ? 1 : 0,
     body.location?.trim() || null,
     body.notes?.trim() || null,
+    body.colorOverride === undefined ? 0 : 1,
+    body.colorOverride ?? null,
     body.recurrenceType ?? null,
     body.recurrenceUntil ?? null,
     new Date().toISOString(),
@@ -278,6 +289,26 @@ export async function upsertCalendarException(request: Request, env: Env) {
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
 
+  // Imports can replace an occurrence without specifying its color.
+  // Preserve the prior per-occurrence color when that field is omitted.
+  const overrides = { ...(body.overrides ?? {}) };
+  if (!Object.prototype.hasOwnProperty.call(overrides, "colorOverride")) {
+    const existing = await env.DB.prepare(
+      "SELECT overrides_json FROM calendar_event_exceptions WHERE series_id = ? AND original_start_at = ? LIMIT 1",
+    ).bind(body.seriesId, body.originalStartAt).first<{ overrides_json: string | null }>();
+    if (existing?.overrides_json) {
+      try {
+        const previous = JSON.parse(existing.overrides_json) as { colorOverride?: unknown };
+        if (previous.colorOverride === null ||
+            (typeof previous.colorOverride === "string" && /^#[0-9a-fA-F]{6}$/.test(previous.colorOverride))) {
+          overrides.colorOverride = previous.colorOverride;
+        }
+      } catch {
+        // An old malformed overrides payload should not block the edit.
+      }
+    }
+  }
+
   await env.DB.prepare(
     `
       INSERT INTO calendar_event_exceptions (
@@ -303,7 +334,7 @@ export async function upsertCalendarException(request: Request, env: Env) {
       body.seriesId,
       body.originalStartAt,
       body.cancelled ? 1 : 0,
-      JSON.stringify(body.overrides ?? {}),
+      JSON.stringify(overrides),
       now,
       now,
     )
@@ -410,6 +441,7 @@ export async function splitCalendarSeries(request: Request, env: Env) {
           all_day,
           location,
           notes,
+          color_override,
           series_id,
           created_by_user_id,
           created_at,
@@ -418,7 +450,7 @@ export async function splitCalendarSeries(request: Request, env: Env) {
           recurrence_type,
           recurrence_until
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'series', ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'series', ?, ?)
       `,
     ).bind(
       newId,
@@ -428,6 +460,7 @@ export async function splitCalendarSeries(request: Request, env: Env) {
       newEvent.allDay ? 1 : 0,
       newEvent.location?.trim() || null,
       newEvent.notes?.trim() || null,
+      newEvent.colorOverride ?? null,
       newId,
       newEvent.createdByUserId,
       now,
@@ -477,4 +510,23 @@ export async function deleteCalendarEvent(request: Request, env: Env) {
   }
 
   return json({ ok: true });
+}
+
+
+export async function clearCalendarEvents(
+  _request: Request,
+  env: Env,
+) {
+  await env.DB.batch([
+    env.DB.prepare(
+      "DELETE FROM calendar_event_exceptions",
+    ),
+    env.DB.prepare(
+      "DELETE FROM calendar_events",
+    ),
+  ]);
+
+  return json({
+    ok: true,
+  });
 }

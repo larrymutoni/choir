@@ -23,6 +23,8 @@ const eventSchema = z.object({
   location: z.string().trim().max(200).nullable(),
 
   notes: z.string().trim().max(5000).nullable(),
+
+  colorOverride: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
 });
 
 const scopeSchema = z.enum(["single", "following", "series"]);

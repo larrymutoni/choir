@@ -1,9 +1,9 @@
 import bcrypt from "bcryptjs";
 import { createUserSession } from "@/server/auth/session";
+import { verifyInvitationToken } from "@/server/auth/invitation";
 import {
   createUser,
   findUserByEmail,
-  isEmailAuthorized,
   listUsers,
   updateUserRole,
   updateUserStatus,
@@ -21,6 +21,7 @@ export type RegisterInput = {
   email: string;
   password: string;
   phone?: string | null;
+  invitation?: string | null;
 };
 
 export async function registerUser(input: RegisterInput) {
@@ -35,24 +36,22 @@ export async function registerUser(input: RegisterInput) {
     };
   }
 
-  const authorized = await isEmailAuthorized(email);
+  const plannedMember = (await listMemberEntries()).find(
+    (member) => member.membershipId && member.email.trim().toLowerCase() === email,
+  ) ?? null;
 
-  const plannedMember =
-    authorized
-      ? (
-          await listMemberEntries()
-        ).find(
-          (member) =>
-            member.membershipId &&
-            member.email
-              .trim()
-              .toLowerCase() ===
-              email,
-        ) ?? null
-      : null;
+  // A listed email alone never grants an active account or a preassigned role.
+  // Only the link delivered to that specific member may do so.
+  if (plannedMember?.membershipId &&
+      !verifyInvitationToken(input.invitation ?? "", email, plannedMember.membershipId)) {
+    return { ok: false as const, reason: "invitation_required" as const };
+  }
+  if (!plannedMember && input.invitation) {
+    return { ok: false as const, reason: "invalid_invitation" as const };
+  }
 
   const passwordHash = await bcrypt.hash(input.password, 12);
-  const status = authorized ? "active" : "pending";
+  const status: "active" | "pending" = plannedMember ? "active" : "pending";
   const id = crypto.randomUUID();
 
   await createUser({
@@ -64,6 +63,7 @@ export async function registerUser(input: RegisterInput) {
     phone: input.phone?.trim() || null,
     role: "member",
     status,
+    invitation: input.invitation ?? null,
   });
 
   if (plannedMember) {

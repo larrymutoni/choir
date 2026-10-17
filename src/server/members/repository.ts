@@ -20,12 +20,19 @@ export type MemberEntry = {
   lastname: string;
   email: string;
   phone: string | null;
+  voiceType:
+    | "soprano"
+    | "alto"
+    | "tenor"
+    | null;
+  isOnline: boolean;
   role: MemberRole;
   customRoleId: string | null;
   customRoleName: string | null;
   roleName: string;
   accountStatus: MemberAccountStatus;
   isOfficial: boolean;
+  createdAt: string;
 };
 
 type MemberEntryRow = {
@@ -35,11 +42,18 @@ type MemberEntryRow = {
   lastname: string;
   email: string;
   phone: string | null;
+  voice_type:
+    | "soprano"
+    | "alto"
+    | "tenor"
+    | null;
+  is_online: number;
   role: MemberRole;
   custom_role_id: string | null;
   custom_role_name: string | null;
   account_status: MemberAccountStatus;
   is_official: number;
+  created_at: string;
 };
 
 export type MemberFormInput = {
@@ -47,6 +61,11 @@ export type MemberFormInput = {
   lastname: string;
   email: string;
   phone?: string | null;
+  voiceType?:
+    | "soprano"
+    | "alto"
+    | "tenor"
+    | null;
 };
 
 export type RoleAssignment =
@@ -97,6 +116,14 @@ function mapEntry(
     phone:
       row.phone,
 
+    voiceType:
+      row.voice_type,
+
+    isOnline:
+      Boolean(
+        row.is_online,
+      ),
+
     role:
       row.role,
 
@@ -119,6 +146,9 @@ function mapEntry(
       Boolean(
         row.is_official,
       ),
+
+    createdAt:
+      row.created_at,
   };
 }
 
