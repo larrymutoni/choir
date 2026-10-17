@@ -16,6 +16,10 @@ export default async function CalendarPage() {
 
   return (
     <CalendarClient
+      canClear={
+        user.role === "admin" ||
+        user.role === "super_admin"
+      }
       canManage={hasRolePermission(
         user,
         "calendar",

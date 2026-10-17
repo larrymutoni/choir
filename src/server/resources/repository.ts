@@ -31,6 +31,7 @@ export type Song = {
   program: string | null;
   lyrics: string | null;
   notes: string | null;
+  youtubeUrl: string | null;
   status:
     | "draft"
     | "published";
@@ -66,6 +67,7 @@ export async function createSong(
     program?: string | null;
     lyrics?: string | null;
     notes?: string | null;
+    youtubeUrl?: string | null;
     status:
       | "draft"
       | "published";
@@ -95,6 +97,7 @@ export async function updateSong(
     program?: string | null;
     lyrics?: string | null;
     notes?: string | null;
+    youtubeUrl?: string | null;
     status:
       | "draft"
       | "published";

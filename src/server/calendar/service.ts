@@ -25,6 +25,7 @@ export type CalendarMutationInput = {
   allDay: boolean;
   location: string | null;
   notes: string | null;
+  colorOverride?: string | null;
 };
 
 export type CalendarOccurrence = CalendarMutationInput & {
@@ -59,6 +60,7 @@ function normaliseInput(input: CalendarMutationInput): CalendarMutationInput {
     allDay: input.allDay,
     location: input.location?.trim() || null,
     notes: input.notes?.trim() || null,
+    colorOverride: input.colorOverride,
   };
 }
 
@@ -114,6 +116,7 @@ function buildBaseOccurrence(
     allDay: series.allDay,
     location: series.location,
     notes: series.notes,
+    colorOverride: series.colorOverride,
   };
 }
 
@@ -183,6 +186,12 @@ function differenceOverrides(
     overrides.notes = changed.notes;
   }
 
+  // Even when identical to the series color, keep an explicit choice.
+  // It distinguishes an edit from an import that does not specify any color.
+  if (changed.colorOverride !== undefined) {
+    overrides.colorOverride = changed.colorOverride;
+  }
+
   return overrides;
 }
 
@@ -248,6 +257,7 @@ function rebaseWholeSeries(
     allDay: changed.allDay,
     location: changed.location,
     notes: changed.notes,
+    colorOverride: changed.colorOverride,
   };
 }
 
@@ -269,6 +279,7 @@ export async function listCalendarOccurrences(
     allDay: event.allDay,
     location: event.location,
     notes: event.notes,
+    colorOverride: event.colorOverride,
     seriesId: null,
     originalStartAt: null,
     isRecurring: false,
@@ -516,6 +527,7 @@ export async function updateCalendarItem(
         recurrenceType: series.recurrenceType,
         recurrenceUntil: series.recurrenceUntil,
         createdByUserId: updatedByUserId,
+        colorOverride: changed.colorOverride === undefined ? series.colorOverride : changed.colorOverride,
       },
     });
 

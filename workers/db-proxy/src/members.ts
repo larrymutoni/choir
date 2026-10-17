@@ -10,6 +10,11 @@ type MemberInput = {
   lastname?: string;
   email?: string;
   phone?: string | null;
+  voiceType?:
+    | "soprano"
+    | "alto"
+    | "tenor"
+    | null;
 };
 
 type MemberRow = {
@@ -18,6 +23,11 @@ type MemberRow = {
   lastname: string | null;
   email: string;
   phone: string | null;
+  voice_type:
+    | "soprano"
+    | "alto"
+    | "tenor"
+    | null;
   created_at: string;
   updated_at: string;
 };
@@ -65,11 +75,22 @@ function validateMemberInput(
       body.email ?? "",
     );
 
+  const voiceType =
+    body.voiceType ?? null;
+
   if (
     !firstname ||
     !lastname ||
     !email ||
-    !validEmail(email)
+    !validEmail(email) ||
+    (
+      voiceType !== null &&
+      ![
+        "soprano",
+        "alto",
+        "tenor",
+      ].includes(voiceType)
+    )
   ) {
     return null;
   }
@@ -80,6 +101,7 @@ function validateMemberInput(
     email,
     phone:
       cleanPhone(body.phone),
+    voiceType,
   };
 }
 
@@ -87,6 +109,15 @@ export async function listMembers(
   _request: Request,
   env: Env,
 ) {
+  const now =
+    new Date().toISOString();
+
+  const onlineSince =
+    new Date(
+      Date.now() -
+        5 * 60 * 1000,
+    ).toISOString();
+
   const result =
     await env.DB.prepare(
       `
@@ -97,11 +128,14 @@ export async function listMembers(
         lastname,
         email,
         phone,
+        voice_type,
         role,
         custom_role_id,
         custom_role_name,
         account_status,
-        is_official
+        is_official,
+        is_online,
+        created_at
       FROM (
         SELECT
           members.id AS membership_id,
@@ -127,6 +161,9 @@ export async function listMembers(
             members.phone
           ) AS phone,
 
+          members.voice_type
+            AS voice_type,
+
           CASE
             WHEN users.id IS NOT NULL
               THEN roles.name
@@ -148,7 +185,26 @@ export async function listMembers(
 
           users.status AS account_status,
 
-          1 AS is_official
+          1 AS is_official,
+
+          CASE
+            WHEN users.id IS NOT NULL
+              AND EXISTS (
+                SELECT 1
+                FROM sessions
+                WHERE sessions.user_id = users.id
+                  AND sessions.expires_at > ?
+                  AND COALESCE(
+                    sessions.last_seen_at,
+                    sessions.created_at
+                  ) >= ?
+              )
+            THEN 1
+            ELSE 0
+          END AS is_online,
+
+          members.created_at
+            AS created_at
 
         FROM members
 
@@ -181,6 +237,8 @@ export async function listMembers(
           users.email AS email,
           users.phone AS phone,
 
+          NULL AS voice_type,
+
           roles.name AS role,
 
           users.custom_role_id
@@ -191,7 +249,25 @@ export async function listMembers(
 
           users.status AS account_status,
 
-          0 AS is_official
+          0 AS is_official,
+
+          CASE
+            WHEN EXISTS (
+              SELECT 1
+              FROM sessions
+              WHERE sessions.user_id = users.id
+                AND sessions.expires_at > ?
+                AND COALESCE(
+                  sessions.last_seen_at,
+                  sessions.created_at
+                ) >= ?
+            )
+            THEN 1
+            ELSE 0
+          END AS is_online,
+
+          users.created_at
+            AS created_at
 
         FROM users
 
@@ -216,7 +292,14 @@ export async function listMembers(
         LOWER(firstname),
         LOWER(email)
       `,
-    ).all();
+    )
+      .bind(
+        now,
+        onlineSince,
+        now,
+        onlineSince,
+      )
+      .all();
 
   return json({
     members:
@@ -422,10 +505,11 @@ export async function createMember(
         lastname,
         email,
         phone,
+        voice_type,
         created_at,
         updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `,
     )
       .bind(
@@ -434,6 +518,7 @@ export async function createMember(
         input.lastname,
         input.email,
         input.phone,
+        input.voiceType,
         now,
         now,
       )
@@ -466,48 +551,11 @@ export async function createMember(
    * keep the legacy emails table synchronized
    * while its old admin page still exists.
    */
-  await env.DB.batch([
-    env.DB.prepare(
-      `
-      INSERT OR IGNORE INTO emails (
-        id,
-        email,
-        created_at
-      )
-      VALUES (?, ?, ?)
-      `,
-    ).bind(
-      crypto.randomUUID(),
-      input.email,
-      now,
-    ),
-
-    /*
-     * If this person had already registered
-     * and was waiting for approval,
-     * adding them to the official member list
-     * activates the account automatically.
-     */
-    env.DB.prepare(
-      `
-      UPDATE users
-      SET
-        status = 'active',
-        updated_at = ?
-      WHERE LOWER(email) =
-            LOWER(?)
-        AND role_id = (
-          SELECT id
-          FROM roles
-          WHERE name = 'member'
-          LIMIT 1
-        )
-      `,
-    ).bind(
-      now,
-      input.email,
-    ),
-  ]);
+  // Never activate an existing pending user just because an admin adds
+  // the same email. The invite-holder must register or be approved manually.
+  await env.DB.prepare(
+    `INSERT OR IGNORE INTO emails (id, email, created_at) VALUES (?, ?, ?)`,
+  ).bind(crypto.randomUUID(), input.email, now).run();
 
   return json(
     {
@@ -561,6 +609,7 @@ export async function updateMember(
         lastname,
         email,
         phone,
+        voice_type,
         created_at,
         updated_at
       FROM members
@@ -650,6 +699,7 @@ export async function updateMember(
         lastname = ?,
         email = ?,
         phone = ?,
+        voice_type = ?,
         updated_at = ?
       WHERE id = ?
       `,
@@ -658,6 +708,7 @@ export async function updateMember(
       input.lastname,
       input.email,
       input.phone,
+      input.voiceType,
       now,
       body.id,
     ),
@@ -1359,10 +1410,11 @@ export async function importMembers(
             lastname,
             email,
             phone,
+            voice_type,
             created_at,
             updated_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 
           ON CONFLICT(email)
           DO UPDATE SET
@@ -1372,6 +1424,11 @@ export async function importMembers(
               excluded.lastname,
             phone =
               excluded.phone,
+            voice_type =
+              COALESCE(
+                excluded.voice_type,
+                members.voice_type
+              ),
             updated_at =
               excluded.updated_at
           `,
@@ -1381,6 +1438,7 @@ export async function importMembers(
           member.lastname,
           member.email,
           member.phone,
+          member.voiceType,
           now,
           now,
         ),
@@ -1398,31 +1456,8 @@ export async function importMembers(
           crypto.randomUUID(),
           member.email,
           now,
-        ),
+        )
 
-        /*
-         * If someone registered before the
-         * list was imported, approve them.
-         */
-        env.DB.prepare(
-          `
-          UPDATE users
-          SET
-            status = 'active',
-            updated_at = ?
-          WHERE LOWER(email) =
-                LOWER(?)
-            AND role_id = (
-              SELECT id
-              FROM roles
-              WHERE name = 'member'
-              LIMIT 1
-            )
-          `,
-        ).bind(
-          now,
-          member.email,
-        ),
       );
     }
 

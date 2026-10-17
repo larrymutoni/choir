@@ -75,6 +75,7 @@ export async function createUser(input: {
   phone?: string | null;
   role?: UserRole;
   status?: UserStatus;
+  invitation?: string | null;
 }) {
   return dbRequest<{ ok: true }>("/v1/users", {
     method: "POST",

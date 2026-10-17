@@ -17,6 +17,7 @@ import {
 import {
   createGalleryAlbum,
   deleteGalleryAlbum,
+  reorderGalleryAlbums,
   updateGalleryAlbum,
 } from "@/server/gallery/repository";
 
@@ -183,6 +184,22 @@ export async function PATCH(
   return NextResponse.json({
     ok: true,
   });
+}
+
+export async function PUT(request: Request) {
+  const auth = await requireGalleryManager();
+  if ("response" in auth) return auth.response;
+  const body: unknown = await request.json().catch(() => null);
+  const parsed = z.object({ orderedIds: z.array(z.string().uuid()).max(500) }).safeParse(body);
+  if (!parsed.success || new Set(parsed.data.orderedIds).size !== parsed.data.orderedIds.length) {
+    return NextResponse.json({ message: "Ordre invalide." }, { status: 400 });
+  }
+  try {
+    await reorderGalleryAlbums(parsed.data.orderedIds);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return NextResponse.json({ message: error instanceof Error ? error.message : "Réorganisation impossible." }, { status: 409 });
+  }
 }
 
 export async function DELETE(

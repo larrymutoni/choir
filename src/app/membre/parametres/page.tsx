@@ -13,12 +13,13 @@ import {
 import {
   getSecurityState,
 } from "@/server/auth/security-repository";
+import { listMemberEntries } from "@/server/members/repository";
 
 export default async function AccountPage() {
   const session =
     await requireUser();
 
-  const [profile, security] =
+  const [profile, security, members] =
     await Promise.all([
       getAccountProfile(
         session.email,
@@ -26,11 +27,15 @@ export default async function AccountPage() {
       getSecurityState(
         session.user_id,
       ),
+      listMemberEntries(),
     ]);
 
   if (!profile) {
     return null;
   }
+
+  const ownMember = members.find((member) => member.userId === session.user_id)
+    ?? members.find((member) => !member.userId && member.email.toLowerCase() === session.email.toLowerCase());
 
   return (
     <main className="mx-auto w-full max-w-5xl">
@@ -39,7 +44,7 @@ export default async function AccountPage() {
       </h1>
 
       <AccountSettings
-        profile={profile}
+        profile={{ ...profile, roleName: session.role_name, voiceType: ownMember?.voiceType ?? null }}
         initialEnabled={
           security.twoFactorEnabled
         }

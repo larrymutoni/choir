@@ -1,3 +1,5 @@
+import { PersistentResourcePlayer } from "@/components/resources/PersistentResourcePlayer";
+
 import {
   DashboardShell,
 } from "@/components/dashboard/DashboardShell";
@@ -34,7 +36,8 @@ export default async function MemberLayout({
     );
 
   return (
-    <DashboardShell
+    <PersistentResourcePlayer>
+      <DashboardShell
       links={links}
       user={{
         firstname:
@@ -59,6 +62,7 @@ export default async function MemberLayout({
       }}
     >
       {children}
-    </DashboardShell>
+      </DashboardShell>
+    </PersistentResourcePlayer>
   );
 }

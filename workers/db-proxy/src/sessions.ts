@@ -98,9 +98,10 @@ export async function createSession(
       user_id,
       token_hash,
       expires_at,
-      created_at
+      created_at,
+      last_seen_at
     )
-    VALUES (?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?)
     `,
   )
     .bind(
@@ -108,6 +109,7 @@ export async function createSession(
       body.userId,
       body.tokenHash,
       body.expiresAt,
+      new Date().toISOString(),
       new Date().toISOString(),
     )
     .run();
@@ -138,6 +140,9 @@ export async function findSession(
       400,
     );
   }
+
+  const now =
+    new Date().toISOString();
 
   const row =
     await env.DB.prepare(
@@ -211,7 +216,7 @@ export async function findSession(
     )
       .bind(
         body.tokenHash,
-        new Date().toISOString(),
+        now,
       )
       .first<SessionRow>();
 
@@ -220,6 +225,19 @@ export async function findSession(
       session: null,
     });
   }
+
+  await env.DB.prepare(
+    `
+    UPDATE sessions
+    SET last_seen_at = ?
+    WHERE id = ?
+    `,
+  )
+    .bind(
+      now,
+      row.session_id,
+    )
+    .run();
 
   const isSuperAdmin =
     row.role ===

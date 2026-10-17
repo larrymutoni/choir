@@ -26,6 +26,8 @@ export type AccountProfile = {
   email: string;
   phone: string | null;
   avatarKey: string | null;
+  roleName?: string;
+  voiceType?: "soprano" | "alto" | "tenor" | null;
   role:
     | "member"
     | "admin"
@@ -336,8 +338,20 @@ export function ProfileSettings({
             {firstname} {lastname}
           </h2>
           <p className="mt-1 text-xs text-slate-500">
-            {roleLabel(profile.role)}
+            {profile.roleName ?? roleLabel(profile.role)}
           </p>
+          <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-center">
+            <p className="text-[11px] font-semibold text-slate-500">Pupitre</p>
+            <p className="text-sm font-semibold text-slate-800">
+              {profile.voiceType === "soprano"
+                ? "Soprano"
+                : profile.voiceType === "alto"
+                  ? "Alto"
+                  : profile.voiceType === "tenor"
+                    ? "Ténor"
+                    : "Non renseigné"}
+            </p>
+          </div>
 
           {avatarKey && (
             <button

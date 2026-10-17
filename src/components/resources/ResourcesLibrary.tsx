@@ -41,6 +41,10 @@ import {
 import { NotifyMembersField } from "@/components/notifications/NotifyMembersField";
 import { publishMemberUpdate } from "@/lib/publish-member-update";
 
+import {
+  useResizableColumns,
+} from "@/components/ui/useResizableColumns";
+
 type ApiMessage = {
   message?: string;
   error?: string;
@@ -65,12 +69,23 @@ type MobilePane =
   | "song"
   | "partition";
 
+type ResourceSort =
+  | "updated-desc"
+  | "updated-asc"
+  | "title-asc"
+  | "title-desc"
+  | "composer-asc"
+  | "composer-desc"
+  | "created-desc"
+  | "created-asc";
+
 const ALPHABET =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(
     "",
   );
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 25;
+const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
 
 function songLastUpdated(
   song: Song,
@@ -116,6 +131,18 @@ function fileLabel(
   );
 }
 
+function youtubeEmbedUrl(value: string | null): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    if (!["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"].includes(host)) return null;
+    const id = host === "youtu.be" ? url.pathname.slice(1).split("/")[0] : url.searchParams.get("v");
+    return /^[A-Za-z0-9_-]{11}$/.test(id ?? "")
+      ? `https://www.youtube-nocookie.com/embed/${id}` : null;
+  } catch { return null; }
+}
+
 function initialLetter(
   value: string,
 ) {
@@ -140,6 +167,23 @@ function initialLetter(
 }
 
 export function ResourcesLibrary() {
+  const resourceColumns = useResizableColumns({
+    storageKey: "chorale-resource-column-widths",
+    columnCount: 4,
+    minWidth: 80,
+  });
+
+  const [pageSize, setPageSize] =
+    useState(PAGE_SIZE);
+
+  const [
+    resourceSort,
+    setResourceSort,
+  ] =
+    useState<ResourceSort>(
+      "updated-desc",
+    );
+
   const [
     data,
     setData,
@@ -334,18 +378,113 @@ export function ResourcesLibrary() {
           },
         )
         .sort(
-          (left, right) =>
-            songLastUpdated(
-              right,
-            ) -
-            songLastUpdated(
-              left,
-            ),
+          (left, right) => {
+            if (
+              resourceSort ===
+              "title-asc"
+            ) {
+              return left.title.localeCompare(
+                right.title,
+                "fr",
+                {
+                  sensitivity:
+                    "base",
+                },
+              );
+            }
+
+            if (
+              resourceSort ===
+              "title-desc"
+            ) {
+              return right.title.localeCompare(
+                left.title,
+                "fr",
+                {
+                  sensitivity:
+                    "base",
+                },
+              );
+            }
+
+            if (
+              resourceSort === "composer-asc" ||
+              resourceSort === "composer-desc"
+            ) {
+              const result =
+                (
+                  left.composer ?? ""
+                ).localeCompare(
+                  right.composer ?? "",
+                  "fr",
+                  {
+                    sensitivity: "base",
+                  },
+                );
+
+              return resourceSort ===
+                "composer-desc"
+                ? -result
+                : result;
+            }
+
+            if (
+              resourceSort ===
+              "created-desc"
+            ) {
+              return (
+                Date.parse(
+                  right.createdAt,
+                ) -
+                Date.parse(
+                  left.createdAt,
+                )
+              );
+            }
+
+            if (
+              resourceSort ===
+              "created-asc"
+            ) {
+              return (
+                Date.parse(
+                  left.createdAt,
+                ) -
+                Date.parse(
+                  right.createdAt,
+                )
+              );
+            }
+
+            if (
+              resourceSort ===
+              "updated-asc"
+            ) {
+              return (
+                songLastUpdated(
+                  left,
+                ) -
+                songLastUpdated(
+                  right,
+                )
+              );
+            }
+
+            return (
+              songLastUpdated(
+                right,
+              ) -
+              songLastUpdated(
+                left,
+              )
+            );
+          },
         );
     }, [
       songs,
       search,
       activeLetter,
+      resourceSort,
     ]);
 
   const pageCount =
@@ -353,7 +492,7 @@ export function ResourcesLibrary() {
       1,
       Math.ceil(
         filteredSongs.length /
-          PAGE_SIZE,
+          pageSize,
       ),
     );
 
@@ -366,9 +505,9 @@ export function ResourcesLibrary() {
   const paginatedSongs =
     filteredSongs.slice(
       (currentPage - 1) *
-        PAGE_SIZE,
+        pageSize,
       currentPage *
-        PAGE_SIZE,
+        pageSize,
     );
 
   useEffect(() => {
@@ -824,21 +963,107 @@ export function ResourcesLibrary() {
               </div>
 
               {!selectedSong && (
-                <div className="hidden grid-cols-[minmax(0,1.5fr)_minmax(160px,0.7fr)_90px_100px] border-b border-slate-200 bg-slate-50 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 sm:grid">
-                  <span>
-                    Morceau
+                <div
+                  data-resizable-grid
+                  style={
+                    resourceColumns.gridTemplateColumns
+                      ? {
+                          gridTemplateColumns:
+                            resourceColumns.gridTemplateColumns,
+                        }
+                      : undefined
+                  }
+                  className="hidden grid-cols-[minmax(0,1.5fr)_minmax(160px,0.7fr)_90px_100px] border-b border-slate-200 bg-slate-50 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 sm:grid sm:divide-x sm:divide-slate-200"
+                >
+                  <span
+                    onPointerDown={(event) =>
+                      resourceColumns.startResize(event, 0)
+                    }
+                    className="flex items-center pr-3"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setResourceSort((current) =>
+                          current === "title-asc"
+                            ? "title-desc"
+                            : "title-asc",
+                        );
+                        setPage(1);
+                      }}
+                      className="inline-flex items-center gap-1 hover:text-slate-700"
+                    >
+                      Morceau
+                      <span>
+                        {resourceSort === "title-asc"
+                          ? "↑"
+                          : resourceSort === "title-desc"
+                            ? "↓"
+                            : "↕"}
+                      </span>
+                    </button>
                   </span>
 
-                  <span>
-                    Compositeur
+                  <span
+                    onPointerDown={(event) =>
+                      resourceColumns.startResize(event, 1)
+                    }
+                    className="flex items-center px-3"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setResourceSort((current) =>
+                          current === "composer-asc"
+                            ? "composer-desc"
+                            : "composer-asc",
+                        );
+                        setPage(1);
+                      }}
+                      className="inline-flex items-center gap-1 hover:text-slate-700"
+                    >
+                      Compositeur
+                      <span>
+                        {resourceSort === "composer-asc"
+                          ? "↑"
+                          : resourceSort === "composer-desc"
+                            ? "↓"
+                            : "↕"}
+                      </span>
+                    </button>
                   </span>
 
-                  <span className="text-center">
+                  <span
+                    onPointerDown={(event) =>
+                      resourceColumns.startResize(event, 2)
+                    }
+                    className="flex items-center justify-center px-3"
+                  >
                     Fichiers
                   </span>
 
-                  <span>
-                    Modifié
+                  <span className="flex items-center justify-center px-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setResourceSort((current) =>
+                          current === "updated-desc"
+                            ? "updated-asc"
+                            : "updated-desc",
+                        );
+                        setPage(1);
+                      }}
+                      className="inline-flex items-center gap-1 hover:text-slate-700"
+                    >
+                      Modifié
+                      <span>
+                        {resourceSort === "updated-desc"
+                          ? "↓"
+                          : resourceSort === "updated-asc"
+                            ? "↑"
+                            : "↕"}
+                      </span>
+                    </button>
                   </span>
                 </div>
               )}
@@ -893,7 +1118,15 @@ export function ResourcesLibrary() {
                             onClick={() =>
                               openSong(song)
                             }
-                            className="group w-full border-b border-slate-100 px-4 py-3 text-left transition hover:bg-slate-50 sm:grid sm:grid-cols-[minmax(0,1.5fr)_minmax(160px,0.7fr)_90px_100px] sm:items-center sm:px-5"
+                            style={
+                              resourceColumns.gridTemplateColumns
+                                ? {
+                                    gridTemplateColumns:
+                                      resourceColumns.gridTemplateColumns,
+                                  }
+                                : undefined
+                            }
+                            className="group w-full border-b border-slate-100 px-4 py-3 text-left transition hover:bg-slate-50 sm:grid sm:grid-cols-[minmax(0,1.5fr)_minmax(160px,0.7fr)_90px_100px] sm:items-center sm:px-5 sm:py-0 sm:divide-x sm:divide-slate-200 sm:[&>span]:self-stretch sm:[&>span]:py-3 sm:[&>span]:px-3"
                           >
                             <span className="flex min-w-0 items-center gap-3">
                               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition group-hover:bg-blue-50 group-hover:text-blue-600">
@@ -951,7 +1184,7 @@ export function ResourcesLibrary() {
                                 "—"}
                             </span>
 
-                            <span className="hidden text-xs text-slate-400 sm:block">
+                            <span className="hidden text-xs text-slate-400 sm:flex sm:items-center sm:justify-center">
                               {new Intl.DateTimeFormat(
                                 "fr-FR",
                                 {
@@ -1017,6 +1250,68 @@ export function ResourcesLibrary() {
                     },
                   )
                 )}
+
+                <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 px-3 py-2">
+                  <label className="flex items-center gap-2 text-xs text-slate-500">
+                    Trier
+                    <select
+                      value={resourceSort}
+                      onChange={(event) => {
+                        setResourceSort(
+                          event.target.value as ResourceSort,
+                        );
+                        setPage(1);
+                      }}
+                      className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 outline-none"
+                    >
+                      <option value="updated-desc">
+                        Modifié récemment
+                      </option>
+                      <option value="updated-asc">
+                        Modifié anciennement
+                      </option>
+                      <option value="title-asc">
+                        Morceau A → Z
+                      </option>
+                      <option value="title-desc">
+                        Morceau Z → A
+                      </option>
+                      <option value="composer-asc">
+                        Compositeur A → Z
+                      </option>
+                      <option value="created-desc">
+                        Ajout récent
+                      </option>
+                      <option value="created-asc">
+                        Ajout ancien
+                      </option>
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-slate-500">
+                    Afficher
+                    <select
+                      value={pageSize}
+                      onChange={(event) => {
+                        setPageSize(
+                          Number(event.target.value),
+                        );
+                        setPage(1);
+                      }}
+                      className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 outline-none"
+                    >
+                      {PAGE_SIZE_OPTIONS.map(
+                        (size) => (
+                          <option
+                            key={size}
+                            value={size}
+                          >
+                            {size}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </label>
+                </div>
 
                 {pageCount > 1 && (
                   <div className="flex items-center justify-center gap-1 border-t border-slate-100 px-3 py-3">
@@ -1353,6 +1648,21 @@ export function ResourcesLibrary() {
                       )}
                     </section>
 
+                    {youtubeEmbedUrl(selectedSong.youtubeUrl) && (
+                      <section className="ml-auto mt-4 w-full max-w-[360px] overflow-hidden rounded-xl border border-slate-200 bg-white">
+                        <div className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-900">Vidéo YouTube</div>
+                        <iframe
+                          src={youtubeEmbedUrl(selectedSong.youtubeUrl) ?? undefined}
+                          title={`Vidéo : ${selectedSong.title}`}
+                          loading="lazy"
+                          referrerPolicy="strict-origin-when-cross-origin"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowFullScreen
+                          className="block aspect-video w-full border-0"
+                        />
+                      </section>
+                    )}
+
                     <section className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
                       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
                         <h3 className="text-sm font-semibold text-slate-900">
@@ -1685,6 +1995,8 @@ function EditSongModal({
     song.composer ?? "",
   );
 
+  const [youtubeUrl, setYoutubeUrl] = useState(song.youtubeUrl ?? "");
+
   const [
     saving,
     setSaving,
@@ -1763,6 +2075,7 @@ function EditSongModal({
 
                 notes:
                   song.notes,
+                youtubeUrl: youtubeUrl.trim() || null,
 
                 status:
                   song.status,
@@ -1885,6 +2198,13 @@ function EditSongModal({
             />
           </label>
 
+          <label className="mt-4 block">
+            <span className="mb-1.5 block text-xs font-bold text-slate-600">Lien YouTube (facultatif)</span>
+            <input type="url" value={youtubeUrl} onChange={(event) => setYoutubeUrl(event.target.value)}
+              placeholder="https://www.youtube.com/watch?v=…"
+              className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500" />
+          </label>
+
           {error && (
             <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
@@ -1947,6 +2267,8 @@ function CreateSongModal({
     composer,
     setComposer,
   ] = useState("");
+
+  const [youtubeUrl, setYoutubeUrl] = useState("");
 
   const [
     audioFiles,
@@ -2112,6 +2434,7 @@ function CreateSongModal({
                 program: null,
                 lyrics: null,
                 notes: null,
+                youtubeUrl: youtubeUrl.trim() || null,
                 status:
                   "published",
               }),
@@ -2312,6 +2635,13 @@ function CreateSongModal({
               placeholder="Optionnel"
               className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500"
             />
+          </label>
+
+          <label className="mt-4 mb-4 block">
+            <span className="mb-1.5 block text-xs font-bold text-slate-600">Lien YouTube (facultatif)</span>
+            <input type="url" value={youtubeUrl} onChange={(event) => setYoutubeUrl(event.target.value)}
+              placeholder="https://www.youtube.com/watch?v=…"
+              className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500" />
           </label>
 
           <FilePicker

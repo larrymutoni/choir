@@ -70,6 +70,7 @@ type CalendarEvent = {
   allDay: boolean;
   location: string | null;
   notes: string | null;
+  colorOverride: string | null;
   seriesId: string | null;
   originalStartAt: string | null;
   isRecurring: boolean;
@@ -82,10 +83,13 @@ type DisplayEvent = {
   start: string;
   end?: string;
   allDay: boolean;
+  color?: string;
+  contrastColor?: string;
 
   extendedProps: {
     location: string | null;
     notes: string | null;
+    colorOverride: string | null;
     seriesId: string | null;
     originalStartAt: string | null;
     isRecurring: boolean;
@@ -101,6 +105,7 @@ type CalendarForm = {
   allDay: boolean;
   location: string;
   notes: string;
+  colorOverride: string | null;
 
   repeat: RepeatType;
   repeatEnd: RepeatEnd;
@@ -122,6 +127,7 @@ type EventPayload = {
   allDay: boolean;
   location: string | null;
   notes: string | null;
+  colorOverride: string | null;
 };
 
 type ScopeMetadata = {
@@ -154,6 +160,38 @@ type VisibleRange = {
   end: string;
 };
 
+/** Automatic event categories, inferred from existing titles (no database change). */
+const EVENT_COLORS = {
+  repetition: { label: "Répétition", color: "#2563eb" },
+  concert: { label: "Concert / spectacle", color: "#7c3aed" },
+  reunion: { label: "Réunion", color: "#ea580c" },
+  atelier: { label: "Atelier / formation", color: "#0f766e" },
+  vacances: { label: "Vacances / jour férié", color: "#d97706" },
+  autre: { label: "Autre événement", color: "#475569" },
+} as const;
+
+const EVENT_PALETTE = [
+  "#2563eb", "#7c3aed", "#ea580c", "#0f766e",
+  "#d97706", "#475569", "#16a34a", "#dc2626",
+] as const;
+
+function eventCategory(title: string): keyof typeof EVENT_COLORS {
+  const normalized = title.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (/vacanc|conge|ferie|absence|pause|pas de cours|relache|fermeture/.test(normalized)) return "vacances";
+  if (/concert|spectacle|representation|fete de la musique|recital|chorale en scene/.test(normalized)) return "concert";
+  if (/repet|filage|echauffement vocal|\bcours\b|entrainement/.test(normalized)) return "repetition";
+  if (/reunion|assemblee|ag |conseil|bureau/.test(normalized)) return "reunion";
+  if (/atelier|formation|stage|masterclass|technique vocale/.test(normalized)) return "atelier";
+  return "autre";
+}
+
+function eventTextColor(color: string) {
+  const r = parseInt(color.slice(1, 3), 16);
+  const g = parseInt(color.slice(3, 5), 16);
+  const b = parseInt(color.slice(5, 7), 16);
+  return r * 0.299 + g * 0.587 + b * 0.114 > 160 ? "#0f172a" : "#ffffff";
+}
+
 const emptyForm: CalendarForm = {
   title: "",
   date: "",
@@ -162,6 +200,7 @@ const emptyForm: CalendarForm = {
   allDay: false,
   location: "",
   notes: "",
+  colorOverride: null,
   repeat: "none",
   repeatEnd: "never",
   repeatUntil: "",
@@ -251,35 +290,6 @@ async function responseError(
   }
 }
 
-function formatUpcomingEvent(
-  event: DisplayEvent,
-) {
-  const date =
-    new Date(event.start);
-
-  if (event.allDay) {
-    return new Intl.DateTimeFormat(
-      "fr-FR",
-      {
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-      },
-    ).format(date);
-  }
-
-  return new Intl.DateTimeFormat(
-    "fr-FR",
-    {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    },
-  ).format(date);
-}
-
 function escapeIcsText(
   value: string,
 ) {
@@ -360,8 +370,10 @@ function nextIcsDate(
 
 export function CalendarClient({
   canManage,
+  canClear,
 }: {
   canManage: boolean;
+  canClear: boolean;
 }) {
   const calendarRef =
     useRef<CalendarRef | null>(
@@ -386,6 +398,11 @@ export function CalendarClient({
   const [
     importOpen,
     setImportOpen,
+  ] = useState(false);
+
+  const [
+    clearingCalendar,
+    setClearingCalendar,
   ] = useState(false);
 
   const [
@@ -622,6 +639,10 @@ export function CalendarClient({
 
               allDay:
                 item.allDay,
+              // FullCalendar 7 : la palette du thème utilise --fc-event-color.
+              // "color" et "contrastColor" priment sur les couleurs globales.
+              color: item.colorOverride ?? EVENT_COLORS[eventCategory(item.title)].color,
+              contrastColor: eventTextColor(item.colorOverride ?? EVENT_COLORS[eventCategory(item.title)].color),
 
               extendedProps: {
                 location:
@@ -629,6 +650,8 @@ export function CalendarClient({
 
                 notes:
                   item.notes,
+
+                colorOverride: item.colorOverride ?? null,
 
                 seriesId:
                   item.seriesId,
@@ -823,6 +846,11 @@ export function CalendarClient({
           event.extendedProps
             .notes ?? "",
         ),
+
+      colorOverride:
+        typeof event.extendedProps.colorOverride === "string"
+          ? event.extendedProps.colorOverride
+          : null,
     };
 
     const nextSelected:
@@ -975,7 +1003,68 @@ export function CalendarClient({
       notes:
         form.notes.trim() ||
         null,
+
+      colorOverride: form.colorOverride,
     };
+  }
+
+  async function findManualConflict(
+    payload: EventPayload,
+  ) {
+    const start =
+      new Date(
+        payload.startAt,
+      );
+
+    const end =
+      new Date(
+        start.getTime() +
+          60_000,
+      );
+
+    const params =
+      new URLSearchParams({
+        start:
+          start.toISOString(),
+
+        end:
+          end.toISOString(),
+      });
+
+    const response =
+      await fetch(
+        `/api/member/calendar?${params.toString()}`,
+        {
+          cache:
+            "no-store",
+        },
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        await responseError(
+          response,
+        ),
+      );
+    }
+
+    const data =
+      (await response.json()) as {
+        events:
+          CalendarEvent[];
+      };
+
+    return (
+      data.events.find(
+        (item) =>
+          Date.parse(
+            item.startAt,
+          ) ===
+          Date.parse(
+            payload.startAt,
+          ),
+      ) ?? null
+    );
   }
 
   async function createEvent(
@@ -1119,6 +1208,20 @@ export function CalendarClient({
         modalMode ===
         "create"
       ) {
+        const conflict =
+          await findManualConflict(
+            payload,
+          );
+
+        if (
+          conflict &&
+          !window.confirm(
+            `Un événement existe déjà à cette heure : "${conflict.title}".\n\nAjouter quand même ?`,
+          )
+        ) {
+          return;
+        }
+
         await createEvent(
           payload,
         );
@@ -1585,6 +1688,85 @@ export function CalendarClient({
     );
   }
 
+  async function exportCalendarExcel() {
+    if (!visibleRange || !displayEvents.length) return;
+    try {
+      const params = new URLSearchParams({ start: visibleRange.start, end: visibleRange.end });
+      const response = await fetch(`/api/member/calendar/export?${params.toString()}`, { cache: "no-store" });
+      if (!response.ok) throw new Error(await responseError(response));
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "calendrier-rayon-de-soleil.xlsx";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      showToast("Calendrier Excel exporté");
+    } catch (cause) {
+      showToast(cause instanceof Error ? cause.message : "Export Excel impossible");
+    }
+  }
+
+  async function clearEntireCalendar() {
+    if (!canClear || clearingCalendar) {
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        "Supprimer tous les événements du calendrier ?",
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const verification =
+      window.prompt(
+        'Tapez exactement "SUPPRIMER" pour confirmer.',
+      );
+
+    if (verification !== "SUPPRIMER") {
+      return;
+    }
+
+    setClearingCalendar(true);
+    setCalendarError("");
+
+    try {
+      const response =
+        await fetch(
+          "/api/member/calendar/clear",
+          {
+            method: "DELETE",
+          },
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          await responseError(response),
+        );
+      }
+
+      setDisplayEvents([]);
+      refetchEvents();
+
+      showToast(
+        "Calendrier entièrement vidé",
+      );
+    } catch (cause) {
+      setCalendarError(
+        cause instanceof Error
+          ? cause.message
+          : "Impossible de vider le calendrier.",
+      );
+    } finally {
+      setClearingCalendar(false);
+    }
+  }
+
   const inputClass =
     "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[16px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 sm:text-sm";
 
@@ -1592,25 +1774,7 @@ export function CalendarClient({
     modalMode === "create" ||
     modalMode === "edit";
 
-  const upcomingEvents =
-    displayEvents
-      .filter(
-        (event) =>
-          new Date(
-            event.start,
-          ).getTime() >=
-          Date.now(),
-      )
-      .sort(
-        (left, right) =>
-          new Date(
-            left.start,
-          ).getTime() -
-          new Date(
-            right.start,
-          ).getTime(),
-      )
-      .slice(0, 6);
+
 
   return (
     <>
@@ -1633,9 +1797,32 @@ export function CalendarClient({
 
             Exporter la vue (.ics)
           </button>
+          <button
+            type="button"
+            onClick={() => void exportCalendarExcel()}
+            disabled={!displayEvents.length}
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Download size={16} /> Exporter la vue (.xlsx)
+          </button>
 
           {canManage && (
             <>
+              {canClear && (
+                <button
+                  type="button"
+                  onClick={clearEntireCalendar}
+                  disabled={clearingCalendar}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-red-200 bg-white px-3.5 text-sm font-semibold text-red-600 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Trash2 size={16} />
+
+                  {clearingCalendar
+                    ? "Suppression…"
+                    : "Vider le calendrier"}
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() =>
@@ -1687,7 +1874,7 @@ export function CalendarClient({
           </div>
         )}
 
-        <div className="grid xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div>
           <div className="relative min-w-0 overflow-x-auto p-3 sm:p-4">
           {calendarLoading && (
             <div className="pointer-events-none absolute right-5 top-5 z-10 rounded-lg border border-[#e2e8f0] bg-white/95 px-3 py-1.5 text-xs font-semibold text-[#64748b] shadow-sm">
@@ -1724,7 +1911,7 @@ export function CalendarClient({
             eventDurationEditable={
               false
             }
-            eventColor="#2563eb"
+            eventColor="#475569"
             eventContrastColor="#ffffff"
             eventDisplay="block"
             events={
@@ -1829,6 +2016,11 @@ export function CalendarClient({
                     .extendedProps
                     .notes ??
                   null,
+
+                colorOverride:
+                  typeof info.event.extendedProps.colorOverride === "string"
+                    ? info.event.extendedProps.colorOverride
+                    : null,
               };
 
               const seriesId =
@@ -1937,79 +2129,6 @@ export function CalendarClient({
           />
           </div>
 
-          <aside className="border-t border-slate-200 bg-slate-50/60 p-4 xl:border-l xl:border-t-0">
-            <div className="mb-4">
-              <h3 className="text-sm font-semibold text-slate-900">
-                À venir
-              </h3>
-            </div>
-
-            {upcomingEvents.length ===
-            0 ? (
-              <p className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-5 text-center text-sm text-slate-500">
-                Aucun événement à venir dans cette période.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {upcomingEvents.map(
-                  (event) => (
-                    <button
-                      key={
-                        event.id
-                      }
-                      type="button"
-                      onClick={() =>
-                        calendarRef.current
-                          ?.getApi()
-                          .gotoDate(
-                            event.start,
-                          )
-                      }
-                      className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-slate-300 hover:shadow-sm"
-                    >
-                      <p className="text-sm font-semibold text-slate-900">
-                        {
-                          event.title
-                        }
-                      </p>
-
-                      <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
-                        <Clock3
-                          size={
-                            13
-                          }
-                        />
-
-                        {formatUpcomingEvent(
-                          event,
-                        )}
-                      </div>
-
-                      {event
-                        .extendedProps
-                        .location && (
-                        <div className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-500">
-                          <MapPin
-                            size={
-                              13
-                            }
-                          />
-
-                          <span className="truncate">
-                            {
-                              event
-                                .extendedProps
-                                .location
-                            }
-                          </span>
-                        </div>
-                      )}
-                    </button>
-                  ),
-                )}
-              </div>
-            )}
-          </aside>
         </div>
       </section>
 
@@ -2107,6 +2226,50 @@ export function CalendarClient({
                       }
                       placeholder="Titre de l'événement"
                     />
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-sm font-bold text-slate-700">Couleur</p>
+                    <div className="flex flex-wrap items-center gap-3">
+                      {EVENT_PALETTE.map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          aria-label={`Choisir la couleur ${color}`}
+                          aria-pressed={(form.colorOverride ?? EVENT_COLORS[eventCategory(form.title)].color) === color}
+                          onClick={() => setForm((current) => ({ ...current, colorOverride: color }))}
+                          title={color}
+                          className={`h-8 w-8 shrink-0 rounded-full border border-white transition hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-800 ${
+                            (form.colorOverride ?? EVENT_COLORS[eventCategory(form.title)].color) === color
+                              ? "ring-2 ring-slate-900 ring-offset-2"
+                              : "ring-1 ring-slate-200"
+                          }`}
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                      <label
+                        title="Autre couleur"
+                        className="relative flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-slate-300 bg-white"
+                      >
+                        <span className="pointer-events-none absolute z-10 text-base font-semibold text-slate-900">+</span>
+                        <input
+                          type="color"
+                          aria-label="Choisir une autre couleur"
+                          value={form.colorOverride ?? EVENT_COLORS[eventCategory(form.title)].color}
+                          onChange={(event) => setForm((current) => ({ ...current, colorOverride: event.target.value }))}
+                          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setForm((current) => ({ ...current, colorOverride: null }))}
+                        aria-label="Rétablir la couleur par défaut"
+                        title="Rétablir la couleur par défaut"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 text-xl text-slate-600 transition hover:bg-slate-100"
+                      >
+                        ↺
+                      </button>
+                    </div>
                   </div>
 
                   <div>
@@ -2619,6 +2782,7 @@ export function CalendarClient({
                     </div>
                   </div>
 
+
                   <div className="flex items-start gap-4">
                     <Clock3
                       size={
@@ -2869,6 +3033,7 @@ export function CalendarClient({
       )}
 
       <CalendarImportModal
+        canClear={canClear}
         open={
           importOpen
         }

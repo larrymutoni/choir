@@ -4,6 +4,9 @@ import { z } from "zod";
 
 import { getCurrentSession } from "@/server/auth/session";
 
+import { sendMemberInvitationEmail } from "@/server/email/member";
+import { makeInvitationUrl } from "@/server/auth/invitation";
+
 import {
   approveMemberUser,
   createMember,
@@ -37,6 +40,15 @@ const memberSchema = z.object({
     .string()
     .trim()
     .max(30)
+    .nullable()
+    .optional(),
+
+  voiceType: z
+    .enum([
+      "soprano",
+      "alto",
+      "tenor",
+    ])
     .nullable()
     .optional(),
 });
@@ -374,13 +386,53 @@ export async function POST(
       );
     }
 
+    const email =
+      memberParsed.data.email
+        .trim()
+        .toLowerCase();
+
+    const before =
+      await listMemberEntries();
+
+    const existing =
+      before.find(
+        (entry) =>
+          entry.email
+            .trim()
+            .toLowerCase() ===
+          email,
+      );
+
     const result =
       await createMember(
         memberParsed.data,
       );
 
+    let invitationSent =
+      false;
+
+    if (!existing?.userId) {
+      try {
+        await sendMemberInvitationEmail(
+          email,
+          makeInvitationUrl(request.url, email, result.id),
+        );
+
+        invitationSent =
+          true;
+      } catch (error) {
+        console.error(
+          "Member invitation email:",
+          error,
+        );
+      }
+    }
+
     return NextResponse.json(
-      result,
+      {
+        ...result,
+        invitationSent,
+      },
       {
         status: 201,
       },

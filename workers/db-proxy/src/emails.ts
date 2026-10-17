@@ -73,24 +73,8 @@ export async function addAuthorizedEmail(request: Request, env: Env) {
       )
       VALUES (?, NULL, NULL, ?, NULL, ?, ?)
       `,
-    ).bind(crypto.randomUUID(), email, now, now),
+    ).bind(crypto.randomUUID(), email, now, now)
 
-    env.DB.prepare(
-      `
-      UPDATE users
-      SET
-        status = 'active',
-        updated_at = ?
-      WHERE LOWER(email) =
-            LOWER(?)
-        AND role_id = (
-          SELECT id
-          FROM roles
-          WHERE name = 'member'
-          LIMIT 1
-        )
-      `,
-    ).bind(now, email),
   ]);
 
   return json(

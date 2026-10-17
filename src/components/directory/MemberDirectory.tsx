@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  Download,
   FileUp,
   Mail,
   MoreHorizontal,
@@ -40,6 +41,10 @@ import {
   showToast,
 } from "@/lib/toast";
 
+import {
+  useResizableColumns,
+} from "@/components/ui/useResizableColumns";
+
 type Role =
   | "member"
   | "admin"
@@ -61,6 +66,14 @@ type MemberEntry = {
   email: string;
   phone: string | null;
 
+  voiceType:
+    | "soprano"
+    | "alto"
+    | "tenor"
+    | null;
+
+  isOnline: boolean;
+
   role: Role;
 
   customRoleId:
@@ -75,6 +88,8 @@ type MemberEntry = {
     AccountStatus;
 
   isOfficial: boolean;
+
+  createdAt: string;
 };
 
 type StatusFilter =
@@ -87,6 +102,20 @@ type StatusFilter =
 type RoleFilter =
   string;
 
+type MemberSort =
+  | "name-asc"
+  | "name-desc"
+  | "email-asc"
+  | "email-desc"
+  | "role-asc"
+  | "role-desc"
+  | "status-asc"
+  | "status-desc"
+  | "account-asc"
+  | "account-desc"
+  | "created-desc"
+  | "created-asc";
+
 type RoleChoice = {
   value: string;
   label: string;
@@ -97,6 +126,7 @@ type MemberForm = {
   lastname: string;
   email: string;
   phone: string;
+  voiceType: string;
   roleAssignment: string;
 };
 
@@ -105,11 +135,13 @@ const emptyForm: MemberForm = {
   lastname: "",
   email: "",
   phone: "",
+  voiceType: "",
   roleAssignment:
     "system:member",
 };
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 25;
+const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
 
 function normalizeEmail(
   value: string,
@@ -174,6 +206,24 @@ function roleLabel(
   }
 
   return "Membre";
+}
+
+function voiceLabel(
+  value: MemberEntry["voiceType"],
+) {
+  if (value === "soprano") {
+    return "Soprano";
+  }
+
+  if (value === "alto") {
+    return "Alto";
+  }
+
+  if (value === "tenor") {
+    return "Ténor";
+  }
+
+  return "Non renseigné";
 }
 
 function memberRoleValue(
@@ -319,6 +369,18 @@ function statusClasses(
   return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/10";
 }
 
+function accountLabel(
+  member: MemberEntry,
+) {
+  if (!member.userId) {
+    return "Pas de compte";
+  }
+
+  return member.isOnline
+    ? "En ligne"
+    : "Hors ligne";
+}
+
 async function responseError(
   response: Response,
 ) {
@@ -338,10 +400,22 @@ async function responseError(
 }
 
 export function MemberDirectory() {
+  const memberColumns = useResizableColumns({
+    storageKey: "chorale-member-column-widths",
+    columnCount: 5,
+    minWidth: 80,
+  });
+
+  const [pageSize, setPageSize] =
+    useState(PAGE_SIZE);
+
   const [
-    nameSortDirection,
-    setNameSortDirection,
-  ] = useState<"asc" | "desc">("asc");
+    memberSort,
+    setMemberSort,
+  ] =
+    useState<MemberSort>(
+      "name-asc",
+    );
 
   const [
     members,
@@ -360,6 +434,11 @@ export function MemberDirectory() {
     error,
     setError,
   ] = useState("");
+
+  const [
+    downloadingPhotos,
+    setDownloadingPhotos,
+  ] = useState(false);
 
   const [
     canManage,
@@ -779,6 +858,9 @@ export function MemberDirectory() {
               member.email,
               member.phone ?? "",
               roleLabel(member),
+              voiceLabel(
+                member.voiceType,
+              ),
             ]
               .join(" ")
               .toLocaleLowerCase(
@@ -802,45 +884,95 @@ export function MemberDirectory() {
       () =>
         [...filteredMembers].sort(
           (left, right) => {
-            const byLastName =
-              left.lastname.localeCompare(
-                right.lastname,
-                "fr",
-                { sensitivity: "base" },
-              );
+            let result = 0;
 
-            if (byLastName !== 0) {
-              return nameSortDirection === "asc"
-                ? byLastName
-                : -byLastName;
+            if (
+              memberSort === "name-asc" ||
+              memberSort === "name-desc"
+            ) {
+              result =
+                left.lastname.localeCompare(
+                  right.lastname,
+                  "fr",
+                  { sensitivity: "base" },
+                ) ||
+                left.firstname.localeCompare(
+                  right.firstname,
+                  "fr",
+                  { sensitivity: "base" },
+                );
+            } else if (
+              memberSort === "email-asc" ||
+              memberSort === "email-desc"
+            ) {
+              result =
+                left.email.localeCompare(
+                  right.email,
+                  "fr",
+                  { sensitivity: "base" },
+                );
+            } else if (
+              memberSort === "role-asc" ||
+              memberSort === "role-desc"
+            ) {
+              result =
+                roleLabel(left).localeCompare(
+                  roleLabel(right),
+                  "fr",
+                  { sensitivity: "base" },
+                );
+            } else if (
+              memberSort === "status-asc" ||
+              memberSort === "status-desc"
+            ) {
+              result =
+                statusLabel(
+                  statusOf(left),
+                ).localeCompare(
+                  statusLabel(
+                    statusOf(right),
+                  ),
+                  "fr",
+                  { sensitivity: "base" },
+                );
+            } else if (
+              memberSort === "account-asc" ||
+              memberSort === "account-desc"
+            ) {
+              result =
+                accountLabel(
+                  left,
+                ).localeCompare(
+                  accountLabel(
+                    right,
+                  ),
+                  "fr",
+                  {
+                    sensitivity:
+                      "base",
+                  },
+                );
+            } else {
+              result =
+                (Date.parse(
+                  left.createdAt || "",
+                ) || 0) -
+                (Date.parse(
+                  right.createdAt || "",
+                ) || 0);
             }
 
-            const byFirstName =
-              left.firstname.localeCompare(
-                right.firstname,
-                "fr",
-                { sensitivity: "base" },
-              );
-
-            if (byFirstName !== 0) {
-              return nameSortDirection === "asc"
-                ? byFirstName
-                : -byFirstName;
-            }
-
-            const byEmail =
-              left.email.localeCompare(
-                right.email,
-                "fr",
-                { sensitivity: "base" },
-              );
-
-            return nameSortDirection === "asc"
-              ? byEmail
-              : -byEmail;
+            return memberSort.endsWith(
+              "-desc",
+            )
+              ? -result
+              : result;
           },
         ),
-      [filteredMembers, nameSortDirection],
+      [
+        filteredMembers,
+        memberSort,
+      ],
     );
 
   const totalPages =
@@ -848,16 +980,16 @@ export function MemberDirectory() {
       1,
       Math.ceil(
         filteredMembers.length /
-          PAGE_SIZE,
+          pageSize,
       ),
     );
 
   const paginatedMembers =
     sortedMembers.slice(
       (currentPage - 1) *
-        PAGE_SIZE,
+        pageSize,
       currentPage *
-        PAGE_SIZE,
+        pageSize,
     );
 
   useEffect(() => {
@@ -980,6 +1112,9 @@ export function MemberDirectory() {
 
       phone:
         member.phone ?? "",
+
+      voiceType:
+        member.voiceType ?? "",
 
       roleAssignment:
         memberRoleValue(
@@ -1135,6 +1270,10 @@ export function MemberDirectory() {
                 phone:
                   form.phone.trim() ||
                   null,
+
+                voiceType:
+                  form.voiceType ||
+                  null,
               }),
           },
         );
@@ -1240,6 +1379,25 @@ export function MemberDirectory() {
           : "Impossible d'effectuer cette action.",
         "error",
       );
+    } finally {
+      setAccountAction(null);
+    }
+  }
+
+  async function resendInvitation(member: MemberEntry) {
+    if (!member.membershipId || member.userId) return;
+    setAccountAction(`invite:${member.membershipId}`);
+    setMenuMemberId(null);
+    try {
+      const response = await fetch("/api/member/members/invitation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId: member.membershipId }),
+      });
+      if (!response.ok) throw new Error(await responseError(response));
+      showToast("Invitation envoyée", "success");
+    } catch (cause) {
+      showToast(cause instanceof Error ? cause.message : "Envoi impossible.", "error");
     } finally {
       setAccountAction(null);
     }
@@ -1351,6 +1509,81 @@ export function MemberDirectory() {
     }
   }
 
+  async function downloadAllMemberPhotos() {
+    if (
+      downloadingPhotos ||
+      !canManageRoles
+    ) {
+      return;
+    }
+
+    setDownloadingPhotos(
+      true,
+    );
+
+    try {
+      const response =
+        await fetch(
+          "/api/member/members/photos",
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          await responseError(
+            response,
+          ),
+        );
+      }
+
+      const blob =
+        await response.blob();
+
+      const url =
+        URL.createObjectURL(
+          blob,
+        );
+
+      const link =
+        document.createElement(
+          "a",
+        );
+
+      link.href = url;
+      link.download =
+        "photos-membres.zip";
+
+      document.body.appendChild(
+        link,
+      );
+
+      link.click();
+      link.remove();
+
+      window.setTimeout(
+        () =>
+          URL.revokeObjectURL(
+            url,
+          ),
+        30_000,
+      );
+
+      showToast(
+        "Photos des membres téléchargées",
+      );
+    } catch (cause) {
+      showToast(
+        cause instanceof Error
+          ? cause.message
+          : "Impossible de télécharger les photos.",
+        "error",
+      );
+    } finally {
+      setDownloadingPhotos(
+        false,
+      );
+    }
+  }
+
   function clearFilters() {
     setSearch("");
     setStatusFilter("all");
@@ -1388,6 +1621,27 @@ export function MemberDirectory() {
                   Gérer les rôles
                 </button>
               )}
+              {canManageRoles && (
+                <button
+                  type="button"
+                  disabled={
+                    downloadingPhotos
+                  }
+                  onClick={() =>
+                    void downloadAllMemberPhotos()
+                  }
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Download
+                    size={16}
+                  />
+
+                  {downloadingPhotos
+                    ? "Préparation…"
+                    : "Photos membres"}
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() =>
@@ -1704,45 +1958,165 @@ export function MemberDirectory() {
             </div>
           ) : (
             <>
-              <div className="hidden grid-cols-[minmax(260px,1.5fr)_minmax(190px,1fr)_150px_125px_85px_48px] border-b border-slate-200 bg-slate-50 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 lg:grid">
-                <span>
+              <div
+                data-resizable-grid
+                style={
+                  memberColumns.gridTemplateColumns
+                    ? {
+                        gridTemplateColumns: `${memberColumns.gridTemplateColumns} 48px`,
+                      }
+                    : undefined
+                }
+                className="hidden grid-cols-[minmax(260px,1.5fr)_minmax(190px,1fr)_150px_125px_85px_48px] border-b border-slate-200 bg-slate-50 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 lg:grid lg:divide-x lg:divide-slate-200"
+              >
+                <span
+                  onPointerDown={(event) =>
+                    memberColumns.startResize(event, 0)
+                  }
+                  className="relative flex items-center pr-3"
+                >
                   <button
                     type="button"
                     onClick={() => {
-                      setNameSortDirection(
-                        (current) =>
-                          current === "asc"
-                            ? "desc"
-                            : "asc",
+                      setMemberSort((current) =>
+                        current === "name-asc"
+                          ? "name-desc"
+                          : "name-asc",
                       );
                       setCurrentPage(1);
                     }}
-                    className="inline-flex items-center gap-1 transition hover:text-slate-700"
-                    aria-label="Trier les membres par nom"
+                    className="inline-flex items-center gap-1 hover:text-slate-700"
                   >
                     Membre
-                    <span
-                      aria-hidden="true"
-                      className="text-[11px]"
-                    >
-                      {nameSortDirection === "asc"
+                    <span>
+                      {memberSort === "name-asc"
                         ? "↑"
-                        : "↓"}
+                        : memberSort === "name-desc"
+                          ? "↓"
+                          : "↕"}
                     </span>
                   </button>
                 </span>
-                <span>
-                  Contact
+
+                <span
+                  onPointerDown={(event) =>
+                    memberColumns.startResize(event, 1)
+                  }
+                  className="relative flex items-center px-3"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMemberSort((current) =>
+                        current === "email-asc"
+                          ? "email-desc"
+                          : "email-asc",
+                      );
+                      setCurrentPage(1);
+                    }}
+                    className="inline-flex items-center gap-1 hover:text-slate-700"
+                  >
+                    Contact
+                    <span>
+                      {memberSort === "email-asc"
+                        ? "↑"
+                        : memberSort === "email-desc"
+                          ? "↓"
+                          : "↕"}
+                    </span>
+                  </button>
                 </span>
-                <span>
-                  Rôle
+
+                <span
+                  onPointerDown={(event) =>
+                    memberColumns.startResize(event, 2)
+                  }
+                  className="relative flex items-center justify-center px-3"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMemberSort((current) =>
+                        current === "role-asc"
+                          ? "role-desc"
+                          : "role-asc",
+                      );
+                      setCurrentPage(1);
+                    }}
+                    className="inline-flex items-center gap-1 hover:text-slate-700"
+                  >
+                    Rôle
+                    <span>
+                      {memberSort === "role-asc"
+                        ? "↑"
+                        : memberSort === "role-desc"
+                          ? "↓"
+                          : "↕"}
+                    </span>
+                  </button>
                 </span>
-                <span>
-                  Statut
+
+                <span
+                  onPointerDown={(event) =>
+                    memberColumns.startResize(event, 3)
+                  }
+                  className="relative flex items-center justify-center px-3"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMemberSort((current) =>
+                        current === "status-asc"
+                          ? "status-desc"
+                          : "status-asc",
+                      );
+                      setCurrentPage(1);
+                    }}
+                    className="inline-flex items-center gap-1 hover:text-slate-700"
+                  >
+                    Statut
+                    <span>
+                      {memberSort === "status-asc"
+                        ? "↑"
+                        : memberSort === "status-desc"
+                          ? "↓"
+                          : "↕"}
+                    </span>
+                  </button>
                 </span>
-                <span>
-                  Compte
+
+                <span className="flex items-center justify-center px-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMemberSort(
+                        (current) =>
+                          current ===
+                          "account-asc"
+                            ? "account-desc"
+                            : "account-asc",
+                      );
+
+                      setCurrentPage(
+                        1,
+                      );
+                    }}
+                    className="inline-flex items-center gap-1 hover:text-slate-700"
+                  >
+                    Compte
+
+                    <span>
+                      {memberSort ===
+                      "account-asc"
+                        ? "↑"
+                        : memberSort ===
+                            "account-desc"
+                          ? "↓"
+                          : "↕"}
+                    </span>
+                  </button>
                 </span>
+
                 <span />
               </div>
 
@@ -1792,7 +2166,14 @@ export function MemberDirectory() {
                         key={
                           rowKey
                         }
-                        className="relative px-4 py-3 transition hover:bg-slate-50 sm:px-5 lg:grid lg:grid-cols-[minmax(260px,1.5fr)_minmax(190px,1fr)_150px_125px_85px_48px] lg:items-center lg:gap-0 lg:py-3"
+                        style={
+                          memberColumns.gridTemplateColumns
+                            ? {
+                                gridTemplateColumns: `${memberColumns.gridTemplateColumns} 48px`,
+                              }
+                            : undefined
+                        }
+                        className="relative px-4 py-3 transition hover:bg-slate-50 sm:px-5 lg:grid lg:grid-cols-[minmax(260px,1.5fr)_minmax(190px,1fr)_150px_125px_85px_48px] lg:items-center lg:gap-0 lg:py-0 lg:divide-x lg:divide-slate-200 lg:[&>*]:self-stretch lg:[&>*]:py-2"
                       >
                         <button
                           type="button"
@@ -1807,10 +2188,28 @@ export function MemberDirectory() {
                           }}
                           className="flex min-w-0 items-center gap-3 text-left lg:pr-4"
                         >
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
-                            {initials(
-                              member,
-                            )}
+                          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-900 text-xs font-semibold text-white">
+                            <span>
+                              {initials(
+                                member,
+                              )}
+                            </span>
+
+                            {canManageRoles &&
+                              member.userId && (
+                                <img
+                                  src={`/api/member/members/avatar/${encodeURIComponent(
+                                    member.userId,
+                                  )}`}
+                                  alt=""
+                                  loading="lazy"
+                                  className="absolute inset-0 h-full w-full object-cover"
+                                  onError={(event) => {
+                                    event.currentTarget.style.display =
+                                      "none";
+                                  }}
+                                />
+                              )}
                           </div>
 
                           <div className="min-w-0">
@@ -1828,20 +2227,16 @@ export function MemberDirectory() {
                           </div>
                         </button>
 
-                        <div className="hidden min-w-0 pr-4 lg:block">
+                        <div className="hidden min-w-0 lg:flex lg:items-center lg:px-3">
                           <p className="truncate text-sm text-slate-700">
                             {
                               member.email
                             }
                           </p>
 
-                          <p className="mt-0.5 truncate text-xs text-slate-400">
-                            {member.phone ??
-                              "—"}
-                          </p>
                         </div>
 
-                        <div className="mt-3 flex items-center gap-2 lg:mt-0">
+                        <div className="mt-3 flex items-center gap-2 lg:mt-0 lg:justify-center lg:px-3">
                           <span
                             className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${roleClasses(
                               member.role,
@@ -1858,7 +2253,7 @@ export function MemberDirectory() {
                           )}
                         </div>
 
-                        <div className="mt-2 lg:mt-0">
+                        <div className="mt-2 lg:mt-0 lg:flex lg:items-center lg:justify-center lg:px-3">
                           <span
                             className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClasses(
                               status,
@@ -1870,10 +2265,32 @@ export function MemberDirectory() {
                           </span>
                         </div>
 
-                        <div className="hidden text-xs text-slate-500 lg:block">
-                          {member.userId
-                            ? "Créé"
-                            : "—"}
+                        <div className="hidden text-xs lg:flex lg:items-center lg:justify-center lg:px-3">
+                          {member.userId ? (
+                            <span
+                              className={`inline-flex items-center gap-1.5 font-medium ${
+                                member.isOnline
+                                  ? "text-emerald-700"
+                                  : "text-slate-400"
+                              }`}
+                            >
+                              <span
+                                className={`h-2 w-2 rounded-full ${
+                                  member.isOnline
+                                    ? "bg-emerald-500"
+                                    : "bg-slate-300"
+                                }`}
+                              />
+
+                              {member.isOnline
+                                ? "En ligne"
+                                : "Hors ligne"}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">
+                              Pas de compte
+                            </span>
+                          )}
                         </div>
 
                         {hasMenu ? (
@@ -1954,6 +2371,18 @@ export function MemberDirectory() {
                                   </button>
                                 )}
 
+                                {editable && !member.userId && member.membershipId && (
+                                  <button
+                                    type="button"
+                                    disabled={accountAction !== null}
+                                    onClick={() => void resendInvitation(member)}
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-blue-700 transition hover:bg-blue-50"
+                                  >
+                                    <Mail size={15} />
+                                    Renvoyer l’invitation
+                                  </button>
+                                )}
+
                                 {editable && (
                                   <button
                                     type="button"
@@ -2008,13 +2437,67 @@ export function MemberDirectory() {
           {!loading &&
             !error &&
             filteredMembers.length >
-              0 &&
-            totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 sm:px-5">
+              0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 sm:px-5">
                 <p className="text-xs text-slate-500">
                   Page {currentPage} sur{" "}
                   {totalPages}
                 </p>
+
+                <label className="flex items-center gap-2 text-xs text-slate-500">
+                  Trier
+                  <select
+                    value={memberSort}
+                    onChange={(event) => {
+                      setMemberSort(
+                        event.target.value as MemberSort,
+                      );
+                      setCurrentPage(1);
+                    }}
+                    className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 outline-none"
+                  >
+                    <option value="name-asc">
+                      Nom A → Z
+                    </option>
+                    <option value="name-desc">
+                      Nom Z → A
+                    </option>
+                    <option value="email-asc">
+                      Email A → Z
+                    </option>
+                    <option value="created-desc">
+                      Ajout récent
+                    </option>
+                    <option value="created-asc">
+                      Ajout ancien
+                    </option>
+                  </select>
+                </label>
+
+                <label className="flex items-center gap-2 text-xs text-slate-500">
+                  Afficher
+                  <select
+                    value={pageSize}
+                    onChange={(event) => {
+                      setPageSize(
+                        Number(event.target.value),
+                      );
+                      setCurrentPage(1);
+                    }}
+                    className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 outline-none"
+                  >
+                    {PAGE_SIZE_OPTIONS.map(
+                      (size) => (
+                        <option
+                          key={size}
+                          value={size}
+                        >
+                          {size}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                </label>
 
                 <div className="flex items-center gap-1.5">
                   <button
@@ -2166,9 +2649,25 @@ export function MemberDirectory() {
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
               <div className="rounded-2xl border border-slate-200 bg-white p-5">
                 <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-900 text-base font-semibold text-white">
-                    {initials(
-                      selected,
+                  <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-900 text-base font-semibold text-white">
+                    <span>
+                      {initials(
+                        selected,
+                      )}
+                    </span>
+
+                    {selected.userId && (
+                      <img
+                        src={`/api/member/members/avatar/${encodeURIComponent(
+                          selected.userId,
+                        )}`}
+                        alt=""
+                        className="absolute inset-0 h-full w-full object-cover"
+                        onError={(event) => {
+                          event.currentTarget.style.display =
+                            "none";
+                        }}
+                      />
                     )}
                   </div>
 
@@ -2281,8 +2780,22 @@ export function MemberDirectory() {
 
                     <span className="font-medium text-slate-900">
                       {selected.userId
-                        ? "Créé"
+                        ? selected.isOnline
+                          ? "En ligne"
+                          : "Hors ligne"
                         : "Non créé"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between px-4 py-3 text-sm">
+                    <span className="text-slate-500">
+                      Pupitre
+                    </span>
+
+                    <span className="font-medium text-slate-900">
+                      {voiceLabel(
+                        selected.voiceType,
+                      )}
                     </span>
                   </div>
 
@@ -2556,6 +3069,39 @@ export function MemberDirectory() {
                     placeholder="Facultatif"
                     className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                   />
+                </label>
+
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-semibold text-slate-600">
+                    Pupitre
+                  </span>
+
+                  <select
+                    value={form.voiceType}
+                    onChange={(
+                      event,
+                    ) =>
+                      setForm({
+                        ...form,
+                        voiceType:
+                          event.target.value,
+                      })
+                    }
+                    className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                  >
+                    <option value="">
+                      Non renseigné
+                    </option>
+                    <option value="soprano">
+                      Soprano
+                    </option>
+                    <option value="alto">
+                      Alto
+                    </option>
+                    <option value="tenor">
+                      Ténor
+                    </option>
+                  </select>
                 </label>
 
                 {editingMember &&

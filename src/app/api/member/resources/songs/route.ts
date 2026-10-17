@@ -11,6 +11,22 @@ import {
   updateSong,
 } from "@/server/resources/repository";
 
+function validYouTubeUrl(value: string | null | undefined) {
+  if (!value) return true;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") return false;
+    const host = url.hostname.toLowerCase();
+    let id: string | null = null;
+    if (host === "youtu.be") id = url.pathname.slice(1).split("/")[0];
+    else if (["youtube.com", "www.youtube.com", "m.youtube.com"].includes(host)) {
+      if (url.pathname === "/watch") id = url.searchParams.get("v");
+      else if (/^\/(embed|shorts|live)\//.test(url.pathname)) id = url.pathname.split("/")[2];
+    }
+    return /^[A-Za-z0-9_-]{11}$/.test(id ?? "");
+  } catch { return false; }
+}
+
 const songSchema = z.object({
   title: z.string().trim().min(1).max(150),
 
@@ -21,6 +37,7 @@ const songSchema = z.object({
   lyrics: z.string().trim().max(50000).nullable().optional(),
 
   notes: z.string().trim().max(10000).nullable().optional(),
+  youtubeUrl: z.string().trim().max(2048).nullable().optional().refine(validYouTubeUrl, "Lien YouTube invalide"),
 
   status: z.enum(["draft", "published"]),
 });

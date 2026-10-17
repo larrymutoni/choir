@@ -7,6 +7,7 @@ type SongRow = {
   program: string | null;
   lyrics: string | null;
   notes: string | null;
+  youtube_url: string | null;
   status: "draft" | "published";
   created_by_user_id: string | null;
   created_at: string;
@@ -70,6 +71,24 @@ function cleanText(value: unknown) {
   }
 
   return value.trim();
+}
+
+function safeYouTubeUrl(value: unknown): string | null | undefined {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string" || value.length > 2048) return undefined;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") return undefined;
+    const host = url.hostname.toLowerCase();
+    let id: string | null = null;
+    if (host === "youtu.be") id = url.pathname.slice(1).split("/")[0];
+    else if (["youtube.com", "www.youtube.com", "m.youtube.com"].includes(host)) {
+      if (url.pathname === "/watch") id = url.searchParams.get("v");
+      else if (/^\/(embed|shorts|live)\//.test(url.pathname)) id = url.pathname.split("/")[2];
+    }
+    return /^[A-Za-z0-9_-]{11}$/.test(id ?? "")
+      ? `https://www.youtube.com/watch?v=${id}` : undefined;
+  } catch { return undefined; }
 }
 
 function optionalText(value: unknown) {
@@ -307,6 +326,7 @@ export async function listResources(request: Request, env: Env) {
         program,
         lyrics,
         notes,
+        youtube_url,
         status,
         created_by_user_id,
         created_at,
@@ -390,6 +410,8 @@ export async function listResources(request: Request, env: Env) {
 
     notes: song.notes,
 
+    youtubeUrl: song.youtube_url,
+
     status: song.status,
 
     createdAt: song.created_at,
@@ -416,6 +438,7 @@ export async function createSong(request: Request, env: Env) {
     program?: string | null;
     lyrics?: string | null;
     notes?: string | null;
+    youtubeUrl?: string | null;
     status?: "draft" | "published";
     createdByUserId?: string;
   }>(request);
@@ -432,6 +455,8 @@ export async function createSong(request: Request, env: Env) {
   }
 
   const status = body.status === "draft" ? "draft" : "published";
+  const youtubeUrl = safeYouTubeUrl(body.youtubeUrl);
+  if (youtubeUrl === undefined) return json({ error: "Invalid YouTube URL" }, 400);
 
   const id = crypto.randomUUID();
 
@@ -446,13 +471,14 @@ export async function createSong(request: Request, env: Env) {
       program,
       lyrics,
       notes,
+      youtube_url,
       status,
       created_by_user_id,
       created_at,
       updated_at
     )
     VALUES (
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
     )
     `,
   )
@@ -463,6 +489,7 @@ export async function createSong(request: Request, env: Env) {
       optionalText(body.program),
       optionalText(body.lyrics),
       optionalText(body.notes),
+      youtubeUrl,
       status,
       body.createdByUserId,
       now,
@@ -487,6 +514,7 @@ export async function updateSong(request: Request, env: Env) {
     program?: string | null;
     lyrics?: string | null;
     notes?: string | null;
+    youtubeUrl?: string | null;
     status?: "draft" | "published";
   }>(request);
 
@@ -502,6 +530,8 @@ export async function updateSong(request: Request, env: Env) {
   }
 
   const status = body.status === "draft" ? "draft" : "published";
+  const youtubeUrl = safeYouTubeUrl(body.youtubeUrl);
+  if (youtubeUrl === undefined) return json({ error: "Invalid YouTube URL" }, 400);
 
   const result = await env.DB.prepare(
     `
@@ -512,6 +542,7 @@ export async function updateSong(request: Request, env: Env) {
         program = ?,
         lyrics = ?,
         notes = ?,
+        youtube_url = CASE WHEN ? = 1 THEN ? ELSE youtube_url END,
         status = ?,
         updated_at = ?
       WHERE id = ?
@@ -523,6 +554,8 @@ export async function updateSong(request: Request, env: Env) {
       optionalText(body.program),
       optionalText(body.lyrics),
       optionalText(body.notes),
+      Object.prototype.hasOwnProperty.call(body, "youtubeUrl") ? 1 : 0,
+      youtubeUrl,
       status,
       new Date().toISOString(),
       body.id,

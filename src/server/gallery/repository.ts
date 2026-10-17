@@ -8,6 +8,7 @@ export type GalleryAlbum = {
   description: string | null;
   activity: string | null;
   album_date: string;
+  sort_order: number | null;
   cover_media_id: string | null;
   media_count: number;
   photo_count: number;
@@ -56,6 +57,13 @@ export async function createGalleryAlbum(input: {
   return dbRequest<{ ok: true; id: string }>("/v1/gallery/albums", {
     method: "POST",
     body: JSON.stringify(input),
+  });
+}
+
+export async function reorderGalleryAlbums(orderedIds: string[]) {
+  return dbRequest<{ ok: true }>("/v1/gallery/albums", {
+    method: "PUT",
+    body: JSON.stringify({ orderedIds }),
   });
 }
 

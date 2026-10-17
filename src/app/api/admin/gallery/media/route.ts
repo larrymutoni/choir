@@ -10,6 +10,10 @@ import {
 import { deleteGalleryMedia } from "@/server/gallery/repository";
 
 const deleteSchema = z.object({ id: z.string().uuid() });
+const moveSchema = z.object({
+  id: z.string().uuid(),
+  albumId: z.string().uuid(),
+});
 
 const updateSchema = z.object({
   id: z.string().uuid(),
@@ -70,6 +74,48 @@ export async function PATCH(request: Request) {
 
   const result = await workerResponse.json().catch(() => ({}));
   return NextResponse.json(result, { status: workerResponse.status });
+}
+
+// PUT volontairement distinct de PATCH : un ancien Worker répondra 405
+// plutôt que d'effacer les dates des médias par mégarde.
+export async function PUT(request: Request) {
+  const auth = await requireGalleryManager();
+  if ("response" in auth) return auth.response;
+
+  const body: unknown = await request.json().catch(() => null);
+  const parsed = moveSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ message: "Média ou album invalide." }, { status: 400 });
+  }
+
+  const token = createGalleryManageToken({
+    userId: auth.session.user_id,
+    mediaId: parsed.data.id,
+  });
+  const target = `${getGalleryWorkerUrl()}/v1/gallery-manage/${encodeURIComponent(
+    parsed.data.id,
+  )}?token=${encodeURIComponent(token)}`;
+
+  try {
+    const workerResponse = await fetch(target, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ albumId: parsed.data.albumId }),
+    });
+    if (workerResponse.status === 405) {
+      return NextResponse.json(
+        { message: "Le Worker Galerie doit être déployé avant le déplacement." },
+        { status: 503 },
+      );
+    }
+    const result = await workerResponse.json().catch(() => ({}));
+    return NextResponse.json(result, { status: workerResponse.status });
+  } catch {
+    return NextResponse.json(
+      { message: "Worker Galerie indisponible." },
+      { status: 502 },
+    );
+  }
 }
 
 export async function DELETE(request: Request) {

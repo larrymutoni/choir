@@ -24,6 +24,7 @@ export type Song = {
   program: string | null;
   lyrics: string | null;
   notes: string | null;
+  youtubeUrl: string | null;
   status: "draft" | "published";
   createdAt: string;
   updatedAt: string;
